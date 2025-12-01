@@ -119,37 +119,64 @@ model Message {
 }
 
 model Quote {
-  id          String      @id @default(cuid())
-  clientId    String
-  agentId     String?
-  status      QuoteStatus @default(DRAFT)
-  totalAmount Float       @default(0)
-  validUntil  DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id             String      @id @default(cuid())
+  number         String      @unique
+  clientId       String
+  agentId        String?
+  status         QuoteStatus @default(DRAFT)
+  subtotal       Float       @default(0)
+  taxRate        Float       @default(15.0) // South African VAT rate
+  taxAmount      Float       @default(0)
+  discountRate   Float       @default(0)
+  discountAmount Float       @default(0)
+  totalAmount    Float       @default(0)
+  notes          String?     @db.Text
+  terms          String?     @db.Text
+  validUntil     DateTime?
+  sentAt         DateTime?
+  acceptedAt     DateTime?
+  expiredAt      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   // Relations
-  client     Client      @relation(fields: [clientId], references: [id])
-  agent      Agent?      @relation(fields: [agentId], references: [id])
+  client     Client            @relation(fields: [clientId], references: [id])
+  agent      Agent?            @relation(fields: [agentId], references: [id])
   items      QuoteItem[]
+  statusLogs QuoteStatusLog[]
   invoice    Invoice?
 
   @@map("quotes")
 }
 
 model QuoteItem {
-  id        String  @id @default(cuid())
-  quoteId   String
-  serviceId String
-  quantity  Int     @default(1)
-  rate      Float
-  lineTotal Float
+  id                String  @id @default(cuid())
+  quoteId           String
+  serviceId         String
+  quantity          Int     @default(1)
+  rate              Float
+  lineTotal         Float
+  customDescription String? // Optional custom description override
 
   // Relations
   quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   service Service @relation(fields: [serviceId], references: [id])
 
   @@map("quote_items")
+}
+
+model QuoteStatusLog {
+  id       String      @id @default(cuid())
+  quoteId  String
+  status   QuoteStatus
+  changedBy String?     // Agent ID who made the change
+  notes    String?     @db.Text
+  createdAt DateTime   @default(now())
+
+  // Relations
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("quote_status_logs")
 }
 
 model Invoice {
@@ -268,6 +295,7 @@ enum QuoteStatus {
   SENT
   PENDING
   ACCEPTED
+  REJECTED
   EXPIRED
 }
 
