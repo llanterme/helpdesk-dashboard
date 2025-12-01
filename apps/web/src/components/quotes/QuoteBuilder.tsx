@@ -52,17 +52,13 @@ export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote }: QuoteBui
     error
   } = useQuoteStore()
 
-  const { clients, fetchClients } = useClientStore()
-  const { agents, fetchAgents } = useAgentStore()
-  const { services, categories, fetchServices, fetchCategories } = useServiceStore()
+  const { clients } = useClientStore()
+  const { agents } = useAgentStore()
+  const { services, categories } = useServiceStore()
 
   // Initialize data
   useEffect(() => {
     if (isOpen) {
-      fetchClients()
-      fetchAgents()
-      fetchServices()
-      fetchCategories()
 
       // Initialize for editing
       if (editQuote) {
