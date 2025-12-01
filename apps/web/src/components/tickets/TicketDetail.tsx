@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { Listbox, Transition } from '@headlessui/react'
 import { ChevronUpDownIcon, CheckIcon, EnvelopeIcon, PhoneIcon } from '@heroicons/react/24/outline'
 import { useTicketStore, TicketWithRelations } from '@/stores/ticketStore'
+import { useAgentStore } from '@/stores/agentStore'
 import { TicketStatus, TicketPriority } from '@helpdesk/database'
 import {
   getChannelIcon,
@@ -36,6 +37,7 @@ interface TicketDetailProps {
 
 export function TicketDetail({ ticket }: TicketDetailProps) {
   const { updateTicket } = useTicketStore()
+  const { agents } = useAgentStore()
   const [isUpdating, setIsUpdating] = useState(false)
 
   if (!ticket) {
@@ -51,6 +53,13 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
 
   const selectedStatusOption = statusOptions.find(option => option.value === ticket.status) || statusOptions[0]
   const selectedPriorityOption = priorityOptions.find(option => option.value === ticket.priority) || priorityOptions[0]
+
+  // Agent options for assignment
+  const agentOptions = [
+    { id: null, name: 'Unassigned', role: 'UNASSIGNED' as const },
+    ...agents.filter(agent => agent.status === 'ACTIVE')
+  ]
+  const selectedAgent = agentOptions.find(agent => agent.id === ticket.agentId) || agentOptions[0]
 
   const handleStatusChange = async (newStatus: TicketStatus) => {
     setIsUpdating(true)
@@ -89,6 +98,27 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
       }
     } catch (error) {
       console.error('Error updating ticket priority:', error)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleAgentAssignment = async (agent: typeof selectedAgent) => {
+    setIsUpdating(true)
+    try {
+      const response = await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ agentId: agent.id }),
+      })
+
+      if (response.ok) {
+        updateTicket(ticket.id, { agentId: agent.id, agent: agent.id ? agent : null })
+      }
+    } catch (error) {
+      console.error('Error assigning ticket:', error)
     } finally {
       setIsUpdating(false)
     }
@@ -220,6 +250,89 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
                               <span className={`block truncate ${selected ? 'font-medium' : ''}`}>
                                 {option.label}
                               </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-600">
+                                  <CheckIcon className="h-4 w-4" />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </Listbox.Option>
+                      ))}
+                    </Listbox.Options>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+
+            {/* Agent Assignment Control */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Assigned to</label>
+              <Listbox
+                value={selectedAgent}
+                onChange={(agent) => handleAgentAssignment(agent)}
+                disabled={isUpdating}
+              >
+                <div className="relative">
+                  <Listbox.Button className="relative w-40 cursor-default rounded-md border border-gray-300 bg-white py-1.5 pl-3 pr-8 text-left shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 text-sm">
+                    <div className="flex items-center gap-2">
+                      {selectedAgent.id ? (
+                        <>
+                          <span
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-medium text-white"
+                            style={{ backgroundColor: selectedAgent.color || '#6B7280' }}
+                          >
+                            {selectedAgent.name.split(' ').map(n => n[0]).join('').slice(0, 1)}
+                          </span>
+                          <span className="block truncate">{selectedAgent.name}</span>
+                        </>
+                      ) : (
+                        <span className="block truncate text-gray-500">Unassigned</span>
+                      )}
+                    </div>
+                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ChevronUpDownIcon className="h-4 w-4 text-gray-400" />
+                    </span>
+                  </Listbox.Button>
+
+                  <Transition
+                    as="div"
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5">
+                      {agentOptions.map((agent) => (
+                        <Listbox.Option
+                          key={agent.id || 'unassigned'}
+                          className={({ active }) =>
+                            `relative cursor-default select-none py-2 pl-8 pr-4 ${
+                              active ? 'bg-slate-100' : ''
+                            }`
+                          }
+                          value={agent}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <div className="flex items-center gap-2">
+                                {agent.id ? (
+                                  <>
+                                    <span
+                                      className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-medium text-white"
+                                      style={{ backgroundColor: agent.color || '#6B7280' }}
+                                    >
+                                      {agent.name.split(' ').map(n => n[0]).join('').slice(0, 1)}
+                                    </span>
+                                    <span className={`block truncate ${selected ? 'font-medium' : ''}`}>
+                                      {agent.name}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className={`block truncate text-gray-500 ${selected ? 'font-medium' : ''}`}>
+                                    Unassigned
+                                  </span>
+                                )}
+                              </div>
                               {selected && (
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-600">
                                   <CheckIcon className="h-4 w-4" />
