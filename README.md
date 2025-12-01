@@ -4,7 +4,7 @@ A modern, multi-channel customer support platform built with Next.js 14, TypeScr
 
 ## 🚀 Features
 
-### ✅ **Current Implementation (Tasks 01-08)**
+### ✅ **Current Implementation (Tasks 01-11)**
 - **Authentication System** - NextAuth.js with JWT sessions and role-based access
 - **Responsive Dashboard** - Modern UI with sidebar navigation and user management
 - **Database Schema** - Complete Prisma schema with 12 entities for helpdesk operations
@@ -14,15 +14,17 @@ A modern, multi-channel customer support platform built with Next.js 14, TypeScr
 - **Real-time Messaging** - Live communication interface with channel-specific styling
 - **File Attachments** - Upload and share documents, images, and files in conversations
 - **Rich Text Messaging** - Emoji support, auto-save drafts, and typing indicators
+- **Service Catalog** - Complete service management with pricing and categories (24 services)
+- **Quote Builder** - Interactive multi-step quote creation with cart system
+- **Invoice System** - Full billing system with payment tracking and overdue detection
 
-### 🚧 **Planned Features (Tasks 09-15)**
-- **Service Catalog** - Pricing and service management
-- **Quote Builder** - Interactive quote creation system
-- **Invoice System** - Billing and payment tracking
-- **Commission System** - Agent payment calculations
+### 🚧 **In Progress (Task 12)**
+- **Commission System** - Agent payment calculations and tracking
+
+### 📋 **Planned Features (Tasks 13-15)**
 - **Analytics Dashboard** - Business intelligence and reporting
-- **Email Integration** - Outlook Graph API integration
-- **WhatsApp Integration** - WhatsApp Business API support
+- **Email Integration** - Outlook Graph API integration (stubbed)
+- **WhatsApp Integration** - WhatsApp Business API support (stubbed)
 
 ## 🏗️ Architecture
 
@@ -71,11 +73,14 @@ A modern, multi-channel customer support platform built with Next.js 14, TypeScr
 3. **Setup database**
    ```bash
    # Create MySQL database 'helpdesk_dev'
-   # Update DATABASE_URL in apps/web/.env.local
+   # Create packages/database/.env with DATABASE_URL
 
    cd packages/database
-   npx prisma db push
+   npx prisma migrate dev --name init
    npx prisma db seed
+
+   # Optional: Load comprehensive sample data including invoices
+   node seed-invoices.js
    ```
 
 4. **Start development server**
@@ -86,15 +91,20 @@ A modern, multi-channel customer support platform built with Next.js 14, TypeScr
 5. **Access the application**
    - URL: http://localhost:3000
    - Login: admin@helpdesk.com / admin123
-   - Navigate to `/tickets` to see the messaging system in action
+   - Navigate to `/tickets` to see the messaging system
+   - Visit `/business/invoices` to see the complete invoice system
+   - Check out `/business/quotes` for the interactive quote builder
 
 ### Environment Setup
 
-Create `apps/web/.env.local`:
+Create `packages/database/.env`:
 ```env
 # Database
 DATABASE_URL="mysql://root:password@localhost:3306/helpdesk_dev"
+```
 
+Create `apps/web/.env.local`:
+```env
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key-here"
@@ -114,13 +124,13 @@ NEXTAUTH_SECRET="your-secret-key-here"
 - [x] Task 07: Agent Management
 - [x] Task 08: Messaging System
 
-### Phase 3: Business Logic 🚧 **(Next)**
-- [ ] Task 09: Service Catalog
-- [ ] Task 10: Quote Builder
-- [ ] Task 11: Invoice System
-- [ ] Task 12: Commission System
+### Phase 3: Business Logic ✅ **(Complete)**
+- [x] Task 09: Service Catalog
+- [x] Task 10: Quote Builder
+- [x] Task 11: Invoice System
 
-### Phase 4: Advanced Features
+### Phase 4: Advanced Features 🚧 **(In Progress)**
+- [ ] Task 12: Commission System **(In Progress)**
 - [ ] Task 13: Dashboard Analytics
 - [ ] Task 14: Email Integration (Stubbed)
 - [ ] Task 15: WhatsApp Integration (Stubbed)
@@ -140,9 +150,14 @@ The seeded database includes:
 - **Admin user**: admin@helpdesk.com / admin123
 - **Sample agents**: Sipho Ndlovu (Senior Agent), Maria Santos (Agent)
 - **Sample clients**: James Mokoena (Mokoena Legal), Sarah Nkosi
-- **Service catalog**: Apostille services (DIRCO & High Court), Notarial certification
+- **Service catalog**: 24 services across 8 categories (Web Development, Digital Marketing, etc.)
 - **Multi-channel tickets**: WhatsApp, Email, Form, and Chat conversations
 - **Realistic conversations**: 15+ sample messages across different channels and scenarios
+- **Quotes & Invoices**: Complete business transaction data
+  - Sample quotes in various statuses (Draft, Sent, Accepted, etc.)
+  - 14+ invoices with realistic payment tracking
+  - Overdue detection (2 invoices past due)
+  - Payment status management (R91,500 collected, R164,000 outstanding)
 - **Performance data**: Agent statistics, commission rates, and activity metrics
 
 ## 🛠️ Development
@@ -153,6 +168,12 @@ npm run dev        # Start development server
 npm run build      # Build for production
 npm run lint       # Run ESLint
 npm run db:studio  # Open Prisma Studio
+
+# Database commands (run from packages/database/)
+npx prisma studio           # Database browser UI
+npx prisma migrate dev      # Run migrations
+node seed-invoices.js       # Load invoice sample data
+node test-invoice-tracking.js # Test payment tracking
 ```
 
 ### Task-Based Development
