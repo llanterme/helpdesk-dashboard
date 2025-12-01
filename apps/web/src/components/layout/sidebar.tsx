@@ -10,6 +10,8 @@ import {
   CogIcon,
   DocumentTextIcon,
   ChartBarIcon,
+  Cog6ToothIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline'
 
 type NavigationItem = {
@@ -42,10 +44,10 @@ const navigation: NavigationItem[] = [
   {
     name: 'Services',
     href: '/services',
-    icon: CogIcon,
+    icon: CurrencyDollarIcon,
     children: [
       { name: 'Service Catalog', href: '/services' },
-      { name: 'Pricing', href: '/services/pricing' },
+      { name: 'Pricing Management', href: '/services/pricing' },
     ]
   },
   {

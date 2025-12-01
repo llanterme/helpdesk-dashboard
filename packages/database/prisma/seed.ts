@@ -74,36 +74,274 @@ async function main() {
     })
   ])
 
-  // Create services catalog
+  // Create comprehensive services catalog
   const services = await Promise.all([
+    // Apostille Services
     prisma.service.create({
       data: {
         name: 'Apostille - DIRCO',
-        category: 'Apostille',
-        description: 'Document apostille through DIRCO (3-4 weeks)',
+        category: 'Apostille Services',
+        description: 'Document apostille through DIRCO (3-4 weeks processing time)',
         rate: 850,
         unit: 'per document',
-        sku: 'APO-DIRCO',
+        sku: 'APO-DIRCO-001',
       }
     }),
     prisma.service.create({
       data: {
         name: 'Apostille - High Court',
-        category: 'Apostille',
-        description: 'Fast-track apostille through High Court (1-2 days)',
+        category: 'Apostille Services',
+        description: 'Fast-track apostille through High Court (1-2 days processing)',
         rate: 1200,
         unit: 'per document',
-        sku: 'APO-HC',
+        sku: 'APO-HC-002',
       }
     }),
     prisma.service.create({
       data: {
+        name: 'Apostille - Express Service',
+        category: 'Apostille Services',
+        description: 'Same-day apostille service (subject to availability)',
+        rate: 2500,
+        unit: 'per document',
+        sku: 'APO-EXP-003',
+      }
+    }),
+
+    // Notary Services
+    prisma.service.create({
+      data: {
         name: 'Notarial Certification',
-        category: 'Notary',
+        category: 'Notary Services',
         description: 'Certified true copy by Notary Public',
         rate: 350,
         unit: 'per document',
-        sku: 'NOT-CERT',
+        sku: 'NOT-CERT-001',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Notarial Attestation',
+        category: 'Notary Services',
+        description: 'Notarial attestation of signatures and documents',
+        rate: 500,
+        unit: 'per signature',
+        sku: 'NOT-ATT-002',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Notarial Translation',
+        category: 'Notary Services',
+        description: 'Certified translation of foreign documents',
+        rate: 180,
+        unit: 'per page',
+        sku: 'NOT-TRANS-003',
+      }
+    }),
+
+    // Legal Document Services
+    prisma.service.create({
+      data: {
+        name: 'Power of Attorney - General',
+        category: 'Legal Documents',
+        description: 'Drafting and notarization of general power of attorney',
+        rate: 1500,
+        unit: 'per document',
+        sku: 'POA-GEN-001',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Power of Attorney - Special',
+        category: 'Legal Documents',
+        description: 'Drafting and notarization of special power of attorney',
+        rate: 2000,
+        unit: 'per document',
+        sku: 'POA-SPEC-002',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Affidavit Drafting',
+        category: 'Legal Documents',
+        description: 'Professional drafting and commissioning of affidavits',
+        rate: 800,
+        unit: 'per affidavit',
+        sku: 'AFF-DRAFT-003',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Contract Review',
+        category: 'Legal Documents',
+        description: 'Professional review and advice on legal contracts',
+        rate: 1200,
+        unit: 'per hour',
+        sku: 'CON-REV-004',
+      }
+    }),
+
+    // Immigration Services
+    prisma.service.create({
+      data: {
+        name: 'Visa Application Support',
+        category: 'Immigration Services',
+        description: 'Complete visa application preparation and submission',
+        rate: 2500,
+        unit: 'per application',
+        sku: 'VISA-APP-001',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Work Permit Application',
+        category: 'Immigration Services',
+        description: 'Work permit application processing and documentation',
+        rate: 4500,
+        unit: 'per application',
+        sku: 'WORK-PER-002',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Permanent Residence Application',
+        category: 'Immigration Services',
+        description: 'Complete permanent residence application service',
+        rate: 12500,
+        unit: 'per application',
+        sku: 'PERM-RES-003',
+      }
+    }),
+
+    // Corporate Services
+    prisma.service.create({
+      data: {
+        name: 'Company Registration',
+        category: 'Corporate Services',
+        description: 'Complete company registration with CIPC',
+        rate: 3500,
+        unit: 'per registration',
+        sku: 'COMP-REG-001',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'CIPC Annual Returns',
+        category: 'Corporate Services',
+        description: 'Filing of annual returns with CIPC',
+        rate: 1200,
+        unit: 'per filing',
+        sku: 'CIPC-ANN-002',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'BEE Certificate Application',
+        category: 'Corporate Services',
+        description: 'B-BBEE certificate application and processing',
+        rate: 5500,
+        unit: 'per application',
+        sku: 'BEE-CERT-003',
+      }
+    }),
+
+    // Consultation Services
+    prisma.service.create({
+      data: {
+        name: 'Legal Consultation',
+        category: 'Consultations',
+        description: 'Professional legal consultation and advice',
+        rate: 1500,
+        unit: 'per hour',
+        sku: 'LEGAL-CONS-001',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Document Review Consultation',
+        category: 'Consultations',
+        description: 'Document review and compliance consultation',
+        rate: 1200,
+        unit: 'per hour',
+        sku: 'DOC-REV-002',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Business Setup Consultation',
+        category: 'Consultations',
+        description: 'Comprehensive business setup consultation',
+        rate: 2000,
+        unit: 'per consultation',
+        sku: 'BUS-SETUP-003',
+      }
+    }),
+
+    // Express Services
+    prisma.service.create({
+      data: {
+        name: 'Express Document Processing',
+        category: 'Express Services',
+        description: 'Priority processing for urgent document requirements',
+        rate: 750,
+        unit: 'per document',
+        sku: 'EXP-DOC-001',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Weekend Service Fee',
+        category: 'Express Services',
+        description: 'Additional fee for weekend and holiday services',
+        rate: 1000,
+        unit: 'flat fee',
+        sku: 'WEEKEND-002',
+      }
+    }),
+
+    // Translation Services
+    prisma.service.create({
+      data: {
+        name: 'Certified Translation - Afrikaans',
+        category: 'Translation Services',
+        description: 'Official certified translation to/from Afrikaans',
+        rate: 160,
+        unit: 'per page',
+        sku: 'TRANS-AFR-001',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Certified Translation - Portuguese',
+        category: 'Translation Services',
+        description: 'Official certified translation to/from Portuguese',
+        rate: 180,
+        unit: 'per page',
+        sku: 'TRANS-POR-002',
+      }
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Certified Translation - French',
+        category: 'Translation Services',
+        description: 'Official certified translation to/from French',
+        rate: 200,
+        unit: 'per page',
+        sku: 'TRANS-FRE-003',
+      }
+    }),
+
+    // Inactive service for testing
+    prisma.service.create({
+      data: {
+        name: 'Deprecated Service - Old Process',
+        category: 'Legacy Services',
+        description: 'This service is no longer available',
+        rate: 500,
+        unit: 'per item',
+        sku: 'LEGACY-001',
+        active: false,
       }
     })
   ])
