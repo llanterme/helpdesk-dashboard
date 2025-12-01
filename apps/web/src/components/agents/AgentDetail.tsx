@@ -190,7 +190,7 @@ export function AgentDetail({ agentId }: AgentDetailProps) {
         <div className="flex items-center gap-4">
           {/* Avatar */}
           <div className="relative">
-            {agent.avatar ? (
+            {agent.avatar && (agent.avatar.startsWith('http') || agent.avatar.startsWith('/')) ? (
               <img
                 src={agent.avatar}
                 alt={agent.name}

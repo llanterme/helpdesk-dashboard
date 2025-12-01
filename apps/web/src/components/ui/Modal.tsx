@@ -84,7 +84,7 @@ export function Modal({
                   </div>
                 )}
 
-                <div className={title ? '' : 'p-6'}>
+                <div className="p-6">
                   {children}
                 </div>
               </Dialog.Panel>
