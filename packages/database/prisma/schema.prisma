@@ -1,0 +1,285 @@
+// This is your Prisma schema file,
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      UserRole @default(AGENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  agent Agent?
+
+  @@map("users")
+}
+
+model Agent {
+  id             String      @id @default(cuid())
+  userId         String?     @unique
+  name           String
+  email          String      @unique
+  phone          String?
+  role           AgentRole   @default(AGENT)
+  avatar         String?
+  color          String?
+  commissionRate Float       @default(50.0)
+  status         AgentStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  user     User?     @relation(fields: [userId], references: [id])
+  tickets  Ticket[]
+  quotes   Quote[]
+  invoices Invoice[]
+  bills    Bill[]
+
+  @@map("agents")
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  company   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tickets  Ticket[]
+  quotes   Quote[]
+  invoices Invoice[]
+
+  @@map("clients")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  description String?
+  rate        Float
+  unit        String   @default("per item")
+  sku         String   @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  quoteItems   QuoteItem[]
+  invoiceItems InvoiceItem[]
+
+  @@map("services")
+}
+
+model Ticket {
+  id        String        @id @default(cuid())
+  subject   String
+  channel   TicketChannel
+  status    TicketStatus  @default(OPEN)
+  priority  TicketPriority @default(MEDIUM)
+  unread    Boolean       @default(true)
+  clientId  String
+  agentId   String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relations
+  client   Client    @relation(fields: [clientId], references: [id])
+  agent    Agent?    @relation(fields: [agentId], references: [id])
+  messages Message[]
+
+  @@map("tickets")
+}
+
+model Message {
+  id         String      @id @default(cuid())
+  ticketId   String
+  senderType SenderType
+  senderId   String?
+  content    String      @db.Text
+  timestamp  DateTime    @default(now())
+  read       Boolean     @default(false)
+
+  // Relations
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Quote {
+  id          String      @id @default(cuid())
+  clientId    String
+  agentId     String?
+  status      QuoteStatus @default(DRAFT)
+  totalAmount Float       @default(0)
+  validUntil  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  client     Client      @relation(fields: [clientId], references: [id])
+  agent      Agent?      @relation(fields: [agentId], references: [id])
+  items      QuoteItem[]
+  invoice    Invoice?
+
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id        String  @id @default(cuid())
+  quoteId   String
+  serviceId String
+  quantity  Int     @default(1)
+  rate      Float
+  lineTotal Float
+
+  // Relations
+  quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@map("quote_items")
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  quoteId     String?       @unique
+  clientId    String
+  agentId     String?
+  status      InvoiceStatus @default(PENDING)
+  totalAmount Float
+  dueDate     DateTime?
+  paidDate    DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  quote  Quote?        @relation(fields: [quoteId], references: [id])
+  client Client        @relation(fields: [clientId], references: [id])
+  agent  Agent?        @relation(fields: [agentId], references: [id])
+  items  InvoiceItem[]
+  bill   Bill?
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id        String  @id @default(cuid())
+  invoiceId String
+  serviceId String
+  quantity  Int     @default(1)
+  rate      Float
+  lineTotal Float
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model Bill {
+  id          String     @id @default(cuid())
+  invoiceId   String     @unique
+  agentId     String
+  totalAmount Float
+  status      BillStatus @default(DRAFT)
+  createdAt   DateTime   @default(now())
+  paidDate    DateTime?
+
+  // Relations
+  invoice Invoice   @relation(fields: [invoiceId], references: [id])
+  agent   Agent     @relation(fields: [agentId], references: [id])
+  items   BillItem[]
+
+  @@map("bills")
+}
+
+model BillItem {
+  id             String @id @default(cuid())
+  billId         String
+  serviceName    String
+  quantity       Int
+  commissionRate Float
+  lineTotal      Float
+
+  // Relations
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@map("bill_items")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  AGENT
+}
+
+enum AgentRole {
+  ADMIN
+  SENIOR_AGENT
+  AGENT
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TicketChannel {
+  WHATSAPP
+  EMAIL
+  FORM
+  CHAT
+}
+
+enum TicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SenderType {
+  CLIENT
+  AGENT
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  PENDING
+  SENT
+  PAID
+  OVERDUE
+}
+
+enum BillStatus {
+  DRAFT
+  SENT
+  PAID
+}
