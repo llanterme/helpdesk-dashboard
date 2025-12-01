@@ -16,6 +16,8 @@ import {
   formatPriority,
   formatChannel
 } from '@/lib/utils'
+import { MessageThread } from '@/components/messages/MessageThread'
+import { MessageComposer } from '@/components/messages/MessageComposer'
 
 const statusOptions = [
   { value: 'OPEN' as TicketStatus, label: 'Open' },
@@ -350,41 +352,17 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
           </div>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {ticket.messages.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
-              <p>No messages yet</p>
-              <p className="text-sm mt-1">Messages will appear here when the conversation starts</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {ticket.messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${
-                    message.senderType === 'AGENT' ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.senderType === 'AGENT'
-                        ? 'bg-slate-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                    <p className={`text-xs mt-1 ${
-                      message.senderType === 'AGENT' ? 'text-slate-200' : 'text-gray-500'
-                    }`}>
-                      {format(new Date(message.timestamp), 'MMM d, h:mm a')}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Message Thread */}
+        <MessageThread
+          ticketId={ticket.id}
+          className="flex-1"
+        />
+
+        {/* Message Composer */}
+        <MessageComposer
+          ticketId={ticket.id}
+          placeholder={`Reply to ${ticket.client.name}...`}
+        />
       </div>
 
       {/* Client Sidebar */}
