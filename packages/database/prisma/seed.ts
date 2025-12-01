@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { seedQuotes } from './seeds/quotes'
 
 const prisma = new PrismaClient()
 
@@ -483,7 +484,10 @@ async function main() {
     })
   }
 
-  console.log('✅ Database seeded successfully with sample messages')
+  // Seed quotes with sample data
+  await seedQuotes()
+
+  console.log('✅ Database seeded successfully with sample data including quotes')
 }
 
 main()
