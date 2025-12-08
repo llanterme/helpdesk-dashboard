@@ -21,6 +21,8 @@ export interface MessageSender {
   email: string
 }
 
+export type WhatsAppMessageStatus = 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'
+
 export interface Message {
   id: string
   ticketId: string
@@ -32,6 +34,11 @@ export interface Message {
   channel: MessageChannel
   sender: MessageSender
   attachments?: MessageAttachment[]
+  // WhatsApp-specific fields
+  whatsappMessageId?: string
+  whatsappStatus?: WhatsAppMessageStatus
+  mediaUrl?: string
+  mediaType?: string
 }
 
 export interface MessageThread {

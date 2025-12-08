@@ -5,9 +5,36 @@ import {
   CheckIcon,
   ClockIcon,
   DocumentTextIcon,
-  PhotoIcon
+  PhotoIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
+
+// WhatsApp status icons
+const WhatsAppStatusIcon = ({ status }: { status?: string }) => {
+  switch (status) {
+    case 'SENT':
+      return <CheckIcon className="h-3.5 w-3.5 text-gray-400" />
+    case 'DELIVERED':
+      return (
+        <div className="flex -space-x-1">
+          <CheckIcon className="h-3.5 w-3.5 text-gray-400" />
+          <CheckIcon className="h-3.5 w-3.5 text-gray-400" />
+        </div>
+      )
+    case 'READ':
+      return (
+        <div className="flex -space-x-1">
+          <CheckIcon className="h-3.5 w-3.5 text-blue-500" />
+          <CheckIcon className="h-3.5 w-3.5 text-blue-500" />
+        </div>
+      )
+    case 'FAILED':
+      return <ExclamationTriangleIcon className="h-3.5 w-3.5 text-red-500" />
+    default:
+      return <ClockIcon className="h-3.5 w-3.5 text-gray-300" />
+  }
+}
 
 interface MessageBubbleProps {
   message: Message
@@ -68,6 +95,11 @@ export function MessageBubble({
 
   const getReadStatus = () => {
     if (message.senderType === 'AGENT') {
+      // For WhatsApp messages, show delivery status
+      if (message.channel === 'WHATSAPP' && message.whatsappStatus) {
+        return <WhatsAppStatusIcon status={message.whatsappStatus} />
+      }
+      // For other channels, show simple read status
       if (message.read) {
         return <CheckCircleIcon className="h-4 w-4 text-green-500" />
       } else {

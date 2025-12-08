@@ -48,13 +48,19 @@ model Agent {
 }
 
 model Client {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  phone     String?
-  company   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  whatsappId  String?  @unique // WhatsApp phone ID (without +)
+  company     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Zoho Integration IDs
+  zohoCrmContactId   String?  @unique // Zoho CRM Contact ID
+  zohoBooksContactId String?  @unique // Zoho Books Contact ID
+  zohoSyncedAt       DateTime? // Last sync timestamp
 
   // Relations
   tickets  Ticket[]
@@ -75,6 +81,10 @@ model Service {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Zoho Books Integration
+  zohoBooksItemId String?   @unique // Zoho Books Item ID
+  zohoSyncedAt    DateTime? // Last sync timestamp
 
   // Relations
   quoteItems   QuoteItem[]
@@ -104,18 +114,31 @@ model Ticket {
 }
 
 model Message {
-  id         String      @id @default(cuid())
+  id         String        @id @default(cuid())
   ticketId   String
   senderType SenderType
   senderId   String?
-  content    String      @db.Text
-  timestamp  DateTime    @default(now())
-  read       Boolean     @default(false)
+  content    String        @db.Text
+  timestamp  DateTime      @default(now())
+  read       Boolean       @default(false)
+
+  // WhatsApp-specific fields
+  whatsappMessageId String?       // WhatsApp message ID for tracking
+  whatsappStatus    MessageStatus? // sent, delivered, read, failed
+  mediaUrl          String?       // URL for media attachments
+  mediaType         String?       // image, document, audio, video
 
   // Relations
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@map("messages")
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }
 
 model Quote {
@@ -138,6 +161,10 @@ model Quote {
   expiredAt      DateTime?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+
+  // Zoho Books Integration
+  zohoBooksEstimateId String?   @unique // Zoho Books Estimate ID
+  zohoSyncedAt        DateTime? // Last sync timestamp
 
   // Relations
   client     Client            @relation(fields: [clientId], references: [id])
@@ -181,15 +208,23 @@ model QuoteStatusLog {
 
 model Invoice {
   id          String        @id @default(cuid())
+  number      String?       @unique // Invoice number (e.g., INV-000001)
   quoteId     String?       @unique
   clientId    String
   agentId     String?
   status      InvoiceStatus @default(PENDING)
+  subtotal    Float         @default(0)
+  taxRate     Float         @default(15.0)
+  taxAmount   Float         @default(0)
   totalAmount Float
   dueDate     DateTime?
   paidDate    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  // Zoho Books Integration
+  zohoBooksInvoiceId String?   @unique // Zoho Books Invoice ID
+  zohoSyncedAt       DateTime? // Last sync timestamp
 
   // Relations
   quote  Quote?        @relation(fields: [quoteId], references: [id])
