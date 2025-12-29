@@ -184,11 +184,21 @@ model EmailAccount {
   id          String        @id @default(cuid())
   email       String        @unique
   displayName String        // e.g., "Easy Services Support"
-  provider    EmailProvider @default(MICROSOFT_365)
+  provider    EmailProvider @default(IMAP_SMTP)
   isActive    Boolean       @default(true)
   isDefault   Boolean       @default(false) // Default account for sending
 
-  // Microsoft Graph OAuth tokens
+  // IMAP Settings (GoDaddy, etc.)
+  imapHost     String?   // e.g., imap.secureserver.net
+  imapPort     Int?      // e.g., 993
+  imapPassword String?   @db.Text // Encrypted password
+
+  // SMTP Settings
+  smtpHost     String?   // e.g., smtpout.secureserver.net
+  smtpPort     Int?      // e.g., 465
+  smtpPassword String?   @db.Text // Encrypted password (usually same as IMAP)
+
+  // Microsoft Graph OAuth tokens (for M365 accounts)
   accessToken     String?   @db.Text
   refreshToken    String?   @db.Text
   tokenExpiry     DateTime?

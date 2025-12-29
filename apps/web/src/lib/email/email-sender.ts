@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { microsoftGraph, SendEmailOptions } from './microsoft-graph'
+import { imapClient, type SmtpConfig } from './imap-client'
 import { SenderType } from '@prisma/client'
 
 export interface SendEmailParams {
@@ -26,7 +26,7 @@ export interface SendEmailResult {
   error?: string
 }
 
-// Send email and optionally record it in a ticket
+// Send email via SMTP and optionally record it in a ticket
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
   try {
     const account = await prisma.emailAccount.findUnique({
@@ -41,8 +41,18 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
       return { success: false, error: 'Email account is not active' }
     }
 
-    // Get valid access token
-    const accessToken = await microsoftGraph.getValidToken(params.accountId)
+    if (!account.smtpHost || !account.smtpPassword) {
+      return { success: false, error: 'SMTP not configured for this account' }
+    }
+
+    // Build SMTP config
+    const smtpConfig: SmtpConfig = {
+      user: account.email,
+      password: account.smtpPassword,
+      host: account.smtpHost,
+      port: account.smtpPort || 465,
+      secure: (account.smtpPort || 465) === 465,
+    }
 
     // Prepare email body with signature
     let finalBody = params.body
@@ -50,19 +60,25 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
       finalBody = `${params.body}<br><br>${account.signature}`
     }
 
-    // Send via Microsoft Graph
-    const sendOptions: SendEmailOptions = {
+    // Send via SMTP
+    const result = await imapClient.sendEmail(smtpConfig, {
+      from: {
+        name: account.displayName || account.email,
+        address: account.email,
+      },
       to: params.to,
       cc: params.cc,
       bcc: params.bcc,
       subject: params.subject,
-      body: finalBody,
-      isHtml: params.isHtml ?? true,
-      attachments: params.attachments,
+      html: params.isHtml !== false ? finalBody : undefined,
+      text: params.isHtml === false ? finalBody : undefined,
+      attachments: params.attachments?.map((att) => ({
+        filename: att.name,
+        contentType: att.contentType,
+        content: Buffer.from(att.contentBytes, 'base64'),
+      })),
       inReplyTo: params.inReplyTo,
-    }
-
-    await microsoftGraph.sendEmail(accessToken, sendOptions)
+    })
 
     // If linked to a ticket, create a message record
     let messageId: string | undefined
@@ -76,6 +92,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
           read: true,
           timestamp: new Date(),
           // Email fields
+          emailMessageId: result.messageId,
           emailSubject: params.subject,
           emailFrom: account.email,
           emailTo: params.to,

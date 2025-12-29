@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { microsoftGraph } from '@/lib/email'
+import { imapClient, type ImapConfig, type SmtpConfig } from '@/lib/email'
 
 // GET /api/email/accounts/[id] - Get single account details
 export async function GET(
@@ -29,10 +29,12 @@ export async function GET(
         syncEnabled: true,
         autoCreateTickets: true,
         signature: true,
+        imapHost: true,
+        imapPort: true,
+        smtpHost: true,
+        smtpPort: true,
         lastSyncAt: true,
         syncError: true,
-        subscriptionId: true,
-        subscriptionExpiry: true,
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -88,6 +90,35 @@ export async function PATCH(
       }
     }
 
+    // Handle password update if provided
+    if (body.password) {
+      updateData.imapPassword = body.password
+      updateData.smtpPassword = body.password
+
+      // Test connection with new password
+      const existingAccount = await prisma.emailAccount.findUnique({
+        where: { id },
+        select: { email: true, imapHost: true, imapPort: true, smtpHost: true, smtpPort: true },
+      })
+
+      if (existingAccount?.imapHost) {
+        const imapConfig: ImapConfig = {
+          user: existingAccount.email,
+          password: body.password,
+          host: existingAccount.imapHost,
+          port: existingAccount.imapPort || 993,
+          tls: true,
+        }
+        const imapTest = await imapClient.testConnection(imapConfig)
+        if (!imapTest.success) {
+          return NextResponse.json(
+            { error: `IMAP connection failed: ${imapTest.error}` },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
     // If setting as default, unset other defaults
     if (updateData.isDefault === true) {
       await prisma.emailAccount.updateMany({
@@ -136,26 +167,10 @@ export async function DELETE(
 
     const account = await prisma.emailAccount.findUnique({
       where: { id },
-      select: {
-        subscriptionId: true,
-        accessToken: true,
-      },
     })
 
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
-    }
-
-    // Try to delete webhook subscription if exists
-    if (account.subscriptionId && account.accessToken) {
-      try {
-        await microsoftGraph.deleteSubscription(
-          account.accessToken,
-          account.subscriptionId
-        )
-      } catch (error) {
-        console.warn('Failed to delete webhook subscription:', error)
-      }
     }
 
     // Delete the account

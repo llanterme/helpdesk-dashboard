@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { XMarkIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, EnvelopeIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline'
 
 interface AddEmailAccountModalProps {
   onClose: () => void
@@ -12,19 +12,31 @@ export function AddEmailAccountModal({
   onClose,
   onSuccess,
 }: AddEmailAccountModalProps) {
-  const [step, setStep] = useState<'form' | 'redirect'>('form')
+  const [step, setStep] = useState<'form' | 'testing' | 'success'>('form')
   const [formData, setFormData] = useState({
     email: '',
     displayName: '',
-    tenantId: '', // Optional for multi-tenant Azure AD
+    password: '',
+    imapHost: 'imap.secureserver.net',
+    imapPort: 993,
+    smtpHost: 'smtpout.secureserver.net',
+    smtpPort: 465,
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [testResult, setTestResult] = useState<{
+    imap: boolean | null
+    smtp: boolean | null
+    imapError?: string
+    smtpError?: string
+  }>({ imap: null, smtp: null })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
+    setStep('testing')
+    setTestResult({ imap: null, smtp: null })
 
     try {
       const response = await fetch('/api/email/accounts', {
@@ -33,7 +45,12 @@ export function AddEmailAccountModal({
         body: JSON.stringify({
           email: formData.email.toLowerCase(),
           displayName: formData.displayName,
-          tenantId: formData.tenantId || undefined,
+          password: formData.password,
+          imapHost: formData.imapHost,
+          imapPort: formData.imapPort,
+          smtpHost: formData.smtpHost,
+          smtpPort: formData.smtpPort,
+          provider: 'IMAP_SMTP',
         }),
       })
 
@@ -43,11 +60,29 @@ export function AddEmailAccountModal({
         throw new Error(data.error || 'Failed to create account')
       }
 
-      // Redirect to Microsoft OAuth
-      setStep('redirect')
-      window.location.href = data.authUrl
+      setTestResult({
+        imap: data.testResults?.imap?.success ?? true,
+        smtp: data.testResults?.smtp?.success ?? true,
+        imapError: data.testResults?.imap?.error,
+        smtpError: data.testResults?.smtp?.error,
+      })
+
+      if (data.testResults?.imap?.success && data.testResults?.smtp?.success) {
+        setStep('success')
+        setTimeout(() => {
+          onSuccess()
+        }, 1500)
+      } else {
+        // Connection test failed
+        setError(
+          `Connection test failed: ${data.testResults?.imap?.error || ''} ${data.testResults?.smtp?.error || ''}`
+        )
+        setStep('form')
+        setLoading(false)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
+      setStep('form')
       setLoading(false)
     }
   }
@@ -62,14 +97,48 @@ export function AddEmailAccountModal({
     setFormData({ ...formData, email, displayName: name })
   }
 
-  if (step === 'redirect') {
+  if (step === 'testing') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-8">
+          <h2 className="text-lg font-semibold mb-6 text-center">Testing Connection...</h2>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              {testResult.imap === null ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
+              ) : testResult.imap ? (
+                <CheckCircleIcon className="w-5 h-5 text-green-600" />
+              ) : (
+                <ExclamationCircleIcon className="w-5 h-5 text-red-600" />
+              )}
+              <span className="text-sm">IMAP Connection (Receiving)</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {testResult.smtp === null ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
+              ) : testResult.smtp ? (
+                <CheckCircleIcon className="w-5 h-5 text-green-600" />
+              ) : (
+                <ExclamationCircleIcon className="w-5 h-5 text-red-600" />
+              )}
+              <span className="text-sm">SMTP Connection (Sending)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'success') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Redirecting to Microsoft...</h2>
+          <CheckCircleIcon className="w-16 h-16 text-green-600 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold mb-2">Account Connected!</h2>
           <p className="text-gray-500 text-sm">
-            Please sign in with your Microsoft 365 account to authorize access.
+            {formData.email} has been added successfully.
           </p>
         </div>
       </div>
@@ -78,8 +147,8 @@ export function AddEmailAccountModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
           <h2 className="text-lg font-semibold">Add Email Account</h2>
           <button
             onClick={onClose}
@@ -160,22 +229,90 @@ export function AddEmailAccountModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Azure AD Tenant ID
-              <span className="text-gray-400 font-normal ml-1">(Optional)</span>
+              Email Password
             </label>
             <input
-              type="text"
-              value={formData.tenantId}
+              type="password"
+              value={formData.password}
               onChange={(e) =>
-                setFormData({ ...formData, tenantId: e.target.value })
+                setFormData({ ...formData, password: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Leave empty for multi-tenant"
+              placeholder="Your email password"
+              required
             />
             <p className="mt-1 text-xs text-gray-500">
-              Only needed if your organization restricts to a specific tenant
+              Your GoDaddy email password. This is stored securely.
             </p>
           </div>
+
+          {/* Advanced Settings (collapsed by default) */}
+          <details className="border border-gray-200 rounded-md">
+            <summary className="px-4 py-2 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50">
+              Advanced Server Settings
+            </summary>
+            <div className="p-4 pt-2 space-y-3 border-t">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    IMAP Server
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.imapHost}
+                    onChange={(e) =>
+                      setFormData({ ...formData, imapHost: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    IMAP Port
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.imapPort}
+                    onChange={(e) =>
+                      setFormData({ ...formData, imapPort: parseInt(e.target.value) })
+                    }
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    SMTP Server
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.smtpHost}
+                    onChange={(e) =>
+                      setFormData({ ...formData, smtpHost: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    SMTP Port
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.smtpPort}
+                    onChange={(e) =>
+                      setFormData({ ...formData, smtpPort: parseInt(e.target.value) })
+                    }
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                Default settings are for GoDaddy. Change only if using a different provider.
+              </p>
+            </div>
+          </details>
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
@@ -183,10 +320,10 @@ export function AddEmailAccountModal({
             </div>
           )}
 
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <p className="text-sm text-blue-800">
-              <strong>Note:</strong> After clicking Connect, you&apos;ll be redirected to
-              Microsoft to sign in and authorize access to the email account.
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+            <p className="text-sm text-amber-800">
+              <strong>Security Note:</strong> Your password is encrypted and stored securely.
+              We only use it to connect to your email server.
             </p>
           </div>
 
@@ -200,10 +337,10 @@ export function AddEmailAccountModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !formData.email || !formData.displayName}
+              disabled={loading || !formData.email || !formData.displayName || !formData.password}
               className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Connecting...' : 'Connect with Microsoft'}
+              {loading ? 'Connecting...' : 'Connect Account'}
             </button>
           </div>
         </form>

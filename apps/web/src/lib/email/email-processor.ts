@@ -456,3 +456,194 @@ export async function getClientContext(clientId: string) {
     },
   }
 }
+
+// IMAP Email Input Format
+export interface ImapEmailInput {
+  messageId: string
+  subject: string
+  from: { name: string; address: string }
+  to: { name: string; address: string }[]
+  cc?: { name: string; address: string }[]
+  date: Date
+  textBody?: string
+  htmlBody?: string
+  inReplyTo?: string
+  references?: string[]
+  attachments?: {
+    filename: string
+    contentType: string
+    size: number
+  }[]
+}
+
+// Process incoming IMAP email and create/update ticket
+export async function processImapEmail(
+  accountId: string,
+  email: ImapEmailInput
+): Promise<ProcessedEmail> {
+  const senderEmail = email.from.address.toLowerCase()
+  const senderName = email.from.name || senderEmail
+
+  // 1. Look up or create client
+  let { client } = await lookupClient(senderEmail)
+  let isNewClient = false
+
+  if (!client) {
+    // Create new client
+    client = await prisma.client.create({
+      data: {
+        name: senderName,
+        email: senderEmail,
+        zohoSyncStatus: 'PENDING',
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        company: true,
+        zohoCrmContactId: true,
+        zohoBooksContactId: true,
+      },
+    })
+    isNewClient = true
+  }
+
+  // 2. Find existing thread or create new ticket
+  let ticketId = await findImapEmailThread(email, client.id)
+  let isNewTicket = false
+
+  // Clean up subject
+  const subject = email.subject || 'No Subject'
+  const cleanSubject = subject.replace(/^(RE:|FW:|FWD:|AW:|SV:|VS:)\s*/gi, '').trim()
+
+  if (!ticketId) {
+    // Create new ticket
+    const ticket = await prisma.ticket.create({
+      data: {
+        subject: cleanSubject || 'Email Inquiry',
+        channel: TicketChannel.EMAIL,
+        status: TicketStatus.OPEN,
+        priority: 'MEDIUM',
+        unread: true,
+        clientId: client.id,
+        emailAccountId: accountId,
+      },
+    })
+    ticketId = ticket.id
+    isNewTicket = true
+  } else {
+    // Update existing ticket
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: {
+        unread: true,
+        updatedAt: new Date(),
+      },
+    })
+  }
+
+  // 3. Process email content
+  const htmlBody = email.htmlBody || `<p>${email.textBody || ''}</p>`
+  const strippedHtml = stripEmailContent(htmlBody)
+  const plainText = email.textBody || htmlToPlainText(strippedHtml)
+
+  // 4. Create message
+  const message = await prisma.message.create({
+    data: {
+      ticketId,
+      senderType: SenderType.CLIENT,
+      senderId: client.id,
+      content: plainText,
+      read: false,
+      timestamp: email.date,
+      // Email-specific fields
+      emailMessageId: email.messageId,
+      emailSubject: subject,
+      emailFrom: senderEmail,
+      emailTo: email.to.map((r) => r.address),
+      emailCc: email.cc?.map((r) => r.address) || [],
+      emailBcc: [],
+      emailInReplyTo: email.inReplyTo,
+      emailReferences: email.references || [],
+      emailHtmlBody: htmlBody,
+    },
+  })
+
+  // 5. Process attachments
+  if (email.attachments && email.attachments.length > 0) {
+    for (const att of email.attachments) {
+      await prisma.attachment.create({
+        data: {
+          messageId: message.id,
+          filename: att.filename,
+          mimeType: att.contentType,
+          size: att.size,
+          storageUrl: '',
+          storageKey: att.filename,
+        },
+      })
+    }
+  }
+
+  return {
+    ticketId,
+    messageId: message.id,
+    isNewTicket,
+    clientId: client.id,
+    isNewClient,
+  }
+}
+
+// Find existing email thread for IMAP email
+async function findImapEmailThread(
+  email: ImapEmailInput,
+  clientId: string
+): Promise<string | null> {
+  // Method 1: Check In-Reply-To header
+  if (email.inReplyTo) {
+    const parentMessage = await prisma.message.findFirst({
+      where: { emailMessageId: email.inReplyTo },
+      select: { ticketId: true },
+    })
+    if (parentMessage) {
+      return parentMessage.ticketId
+    }
+  }
+
+  // Method 2: Check References header
+  if (email.references && email.references.length > 0) {
+    for (const messageId of email.references) {
+      const message = await prisma.message.findFirst({
+        where: { emailMessageId: messageId },
+        select: { ticketId: true },
+      })
+      if (message) {
+        return message.ticketId
+      }
+    }
+  }
+
+  // Method 3: Subject line matching (strip RE:/FW: prefixes)
+  const cleanSubject = email.subject
+    .replace(/^(RE:|FW:|FWD:|AW:|SV:|VS:)\s*/gi, '')
+    .trim()
+
+  if (cleanSubject) {
+    const ticket = await prisma.ticket.findFirst({
+      where: {
+        subject: cleanSubject,
+        channel: TicketChannel.EMAIL,
+        clientId,
+        status: { in: [TicketStatus.OPEN, TicketStatus.PENDING] },
+      },
+      select: { id: true },
+    })
+
+    if (ticket) {
+      return ticket.id
+    }
+  }
+
+  return null
+}

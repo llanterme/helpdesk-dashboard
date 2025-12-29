@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { microsoftGraph } from '@/lib/email'
+import { imapClient, type ImapConfig } from '@/lib/email'
 
-// GET /api/email/inbox - Get emails from configured accounts
+// GET /api/email/inbox - Get emails from configured IMAP accounts
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,11 +15,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const accountId = searchParams.get('accountId')
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
-    const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '25')
-    const search = searchParams.get('search')
+    const folder = searchParams.get('folder') || 'INBOX'
 
-    // Get active accounts
+    // Get active accounts with IMAP credentials
     const accountFilter = accountId
       ? { id: accountId, isActive: true }
       : { isActive: true }
@@ -30,10 +29,9 @@ export async function GET(request: NextRequest) {
         id: true,
         email: true,
         displayName: true,
-        accessToken: true,
-        refreshToken: true,
-        tokenExpiry: true,
-        tenantId: true,
+        imapHost: true,
+        imapPort: true,
+        imapPassword: true,
       },
     })
 
@@ -41,14 +39,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         emails: [],
         total: 0,
-        page,
-        totalPages: 0,
       })
     }
 
     // Fetch emails from each account
     const allEmails: Array<{
       id: string
+      uid: string
       accountId: string
       accountEmail: string
       subject: string
@@ -58,63 +55,40 @@ export async function GET(request: NextRequest) {
       receivedDateTime: string
       isRead: boolean
       hasAttachments: boolean
-      conversationId: string
     }> = []
 
     for (const account of accounts) {
-      if (!account.accessToken || !account.refreshToken) continue
+      if (!account.imapHost || !account.imapPassword) continue
 
       try {
-        const accessToken = await microsoftGraph.getValidToken(account.id)
-
-        // Build filter
-        let filter = ''
-        if (unreadOnly) {
-          filter = 'isRead eq false'
-        }
-        if (search) {
-          const searchFilter = `(contains(subject,'${search}') or contains(from/emailAddress/address,'${search}') or contains(bodyPreview,'${search}'))`
-          filter = filter ? `${filter} and ${searchFilter}` : searchFilter
+        const imapConfig: ImapConfig = {
+          user: account.email,
+          password: account.imapPassword,
+          host: account.imapHost,
+          port: account.imapPort || 993,
+          tls: true,
         }
 
-        const response = await microsoftGraph.listMessages(accessToken, {
-          top: limit,
-          skip: (page - 1) * limit,
-          filter: filter || undefined,
-          orderBy: 'receivedDateTime desc',
-          select: [
-            'id',
-            'subject',
-            'from',
-            'toRecipients',
-            'bodyPreview',
-            'receivedDateTime',
-            'isRead',
-            'hasAttachments',
-            'conversationId',
-          ],
+        const emails = await imapClient.fetchEmails(imapConfig, {
+          folder,
+          limit,
+          unseen: unreadOnly,
         })
 
         // Add account info to each email
-        for (const email of response.value) {
+        for (const email of emails) {
           allEmails.push({
-            id: email.id,
+            id: `${account.id}_${email.uid}`,
+            uid: email.uid,
             accountId: account.id,
             accountEmail: account.email,
             subject: email.subject || '(No Subject)',
-            from: {
-              name: email.from.emailAddress.name,
-              address: email.from.emailAddress.address,
-            },
-            to: email.toRecipients.map((r) => ({
-              name: r.emailAddress.name,
-              address: r.emailAddress.address,
-            })),
-            bodyPreview: email.bodyPreview,
-            receivedDateTime: email.receivedDateTime,
-            isRead: email.isRead,
-            hasAttachments: email.hasAttachments,
-            conversationId: email.conversationId,
+            from: email.from,
+            to: email.to,
+            bodyPreview: email.textBody?.substring(0, 200) || '',
+            receivedDateTime: email.date.toISOString(),
+            isRead: email.flags.includes('\\Seen'),
+            hasAttachments: email.attachments.length > 0,
           })
         }
       } catch (error) {
@@ -133,8 +107,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       emails: allEmails.slice(0, limit),
       total: allEmails.length,
-      page,
-      totalPages: Math.ceil(allEmails.length / limit),
     })
   } catch (error) {
     console.error('Failed to fetch inbox:', error)
