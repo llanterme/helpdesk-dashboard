@@ -25,7 +25,27 @@ export const getZohoBaseUrls = (region: string = 'com') => {
     accounts: `https://accounts.zoho${regionSuffix}.com`,
     books: `https://www.zohoapis${regionSuffix}.com/books/v3`,
     crm: `https://www.zohoapis${regionSuffix}.com/crm/v6`,
+    desk: `https://desk.zoho${regionSuffix}.com/api/v1`,
   }
+}
+
+// Get Zoho Desk specific config
+export const getZohoDeskConfig = () => {
+  return {
+    orgId: process.env.ZOHO_DESK_ORG_ID || process.env.ZOHO_ORGANIZATION_ID || '',
+    departmentId: process.env.ZOHO_DESK_DEPARTMENT_ID || '',
+    webhookSecret: process.env.ZOHO_DESK_WEBHOOK_SECRET || '',
+  }
+}
+
+// Check if Zoho Desk is configured
+export const isZohoDeskConfigured = (): boolean => {
+  return !!(
+    process.env.ZOHO_CLIENT_ID &&
+    process.env.ZOHO_CLIENT_SECRET &&
+    process.env.ZOHO_REFRESH_TOKEN &&
+    (process.env.ZOHO_DESK_ORG_ID || process.env.ZOHO_ORGANIZATION_ID)
+  )
 }
 
 export const getZohoConfig = (): ZohoConfig => {

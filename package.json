@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "start": "npm run start --workspace=@helpdesk/web",
     "lint": "turbo run lint",
     "clean": "turbo run clean"
   },
