@@ -70,9 +70,9 @@ helpdesk-dashboard/
 ## Zoho Integration (Complete)
 
 ### Configured Credentials
-- **Organization**: Easy Services Group (PTY) LTD (ID: 868945505)
+- **Organization**: Easy Services Group (PTY) LTD (ID: 867037917)
 - **Region**: com (US)
-- **Scopes**: ZohoBooks.fullaccess.all, ZohoCRM.modules.ALL
+- **Scopes**: ZohoBooks.fullaccess.all, ZohoCRM.modules.ALL, Desk.tickets.ALL, Desk.contacts.ALL, Desk.basic.ALL
 
 ### Sync Features
 | Entity | Direction | Feature |
@@ -81,6 +81,13 @@ helpdesk-dashboard/
 | **Services** | ← From Zoho | Pull Items with auto-categorization |
 | **Quotes** | → To Zoho | Create/update Estimates, status sync |
 | **Invoices** | → To Zoho | Create/update Invoices, payment recording |
+| **WhatsApp Tickets** | ↔ Bidirectional | Sync via Zoho Desk + HelloSend |
+
+### Zoho Desk Integration (WhatsApp)
+- **Flow**: WhatsApp → HelloSend → Zoho Desk → Helpdesk (webhook) → Agent replies → Zoho Desk API → HelloSend → WhatsApp
+- **Webhook**: `/api/webhooks/zoho-desk` receives ticket.add, ticket.update, IM Message Add events
+- **API Client**: `apps/web/src/lib/zoho/desk.ts` for Zoho Desk API operations
+- **Sync Functions**: `syncTicketsFromZohoDesk()`, `syncReplyToZohoDesk()`, `runFullSyncFromZohoDesk()`
 
 ### Sync API Endpoints
 ```
@@ -89,6 +96,7 @@ helpdesk-dashboard/
 /api/zoho/sync/services   # Service catalog sync
 /api/zoho/sync/quotes     # Quote → Estimate sync
 /api/zoho/sync/invoices   # Invoice + payment sync
+/api/webhooks/zoho-desk   # Zoho Desk webhook (WhatsApp tickets)
 ```
 
 ### UI Components
@@ -116,10 +124,10 @@ helpdesk-dashboard/
 
 ### Planned
 - **Task 13**: Dashboard Analytics
-- **Task 15**: WhatsApp Integration (Business API)
 
 ### Current Phase
-**Status**: ~90% Complete
+**Status**: ~95% Complete
+**WhatsApp**: Fully integrated via Zoho Desk + HelloSend
 **Next Step**: Complete Task 12 - Commission System
 
 ## API Routes Structure
@@ -173,13 +181,15 @@ helpdesk-dashboard/
 ## Key Files Reference
 - **Prisma Schema**: `packages/database/prisma/schema.prisma`
 - **Auth Config**: `apps/web/src/lib/auth.ts`
-- **Zoho Integration**: `apps/web/src/lib/zoho/` (config, auth, books, crm, sync)
+- **Zoho Integration**: `apps/web/src/lib/zoho/` (config, auth, books, crm, desk, sync)
+- **Zoho Desk Client**: `apps/web/src/lib/zoho/desk.ts`
+- **Zoho Desk Webhook**: `apps/web/src/app/api/webhooks/zoho-desk/route.ts`
 - **Zoho Components**: `apps/web/src/components/zoho/`
 - **Email Integration**: `apps/web/src/lib/email/` (microsoft-graph, email-processor, email-sender)
 - **Email Components**: `apps/web/src/components/email/`
 - **Integration Design**: `docs/INTEGRATION_DESIGN.md`
 - **Email Integration Design**: `docs/EMAIL_INTEGRATION_ANALYSIS.md`
-- **WhatsApp Helpers**: `apps/web/src/lib/whatsapp.ts`
+- **WhatsApp Send Route**: `apps/web/src/app/api/whatsapp/send/route.ts`
 - **Main Layout**: `apps/web/src/components/layout/dashboard-layout.tsx`
 
 ## Environment Variables
@@ -187,8 +197,9 @@ See `.env.example` for required configuration:
 - Database connection (DATABASE_URL - PostgreSQL)
 - NextAuth secrets (NEXTAUTH_SECRET, NEXTAUTH_URL)
 - Zoho integration (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN, ZOHO_ORGANIZATION_ID, ZOHO_REGION)
+- Zoho Desk (ZOHO_DESK_ORG_ID, ZOHO_DESK_WEBHOOK_SECRET)
 - Microsoft Graph (MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET)
-- WhatsApp Business API credentials
+- WhatsApp Business API credentials (fallback)
 - Webhook API key
 
 ## Implemented Features
@@ -204,6 +215,12 @@ See `.env.example` for required configuration:
 - Sync dashboard with status tracking and activity logs
 - Client-facing ticket portal
 - Dashboard overview statistics
+- **WhatsApp Integration** (via Zoho Desk + HelloSend):
+  - Webhook receives tickets and messages from Zoho Desk
+  - Two-way sync: incoming messages create tickets, agent replies sent via API
+  - Automatic client creation from WhatsApp contacts
+  - Message threading with Zoho Desk threads
+  - Fallback to direct WhatsApp Business API if Desk unavailable
 - **Email Integration**:
   - Microsoft Graph API OAuth2 authentication
   - Multi-account inbox (info@, support@, sales@)
