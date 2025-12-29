@@ -9,12 +9,15 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "postinstall": "prisma generate --schema=packages/database/prisma/schema.prisma",
     "start": "npm run start --workspace=@helpdesk/web",
     "lint": "turbo run lint",
     "clean": "turbo run clean"
   },
   "devDependencies": {
+    "@prisma/client": "^5.6.0",
     "@zohocrm/zdk-cli": "^1.0.3-beta",
+    "prisma": "^5.6.0",
     "turbo": "^1.10.0",
     "typescript": "^5.2.0",
     "zoho-extension-toolkit": "^1.0.24"
