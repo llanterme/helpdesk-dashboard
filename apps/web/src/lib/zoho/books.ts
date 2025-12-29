@@ -80,14 +80,25 @@ export interface ZohoLineItem {
 }
 
 class ZohoBooksClient {
-  private baseUrl: string
-  private organizationId: string
+  private _baseUrl: string | null = null
+  private _organizationId: string | null = null
 
-  constructor() {
-    const config = getZohoConfig()
-    const urls = getZohoBaseUrls(config.region)
-    this.baseUrl = urls.books
-    this.organizationId = config.organizationId
+  private get baseUrl(): string {
+    if (!this._baseUrl) {
+      const config = getZohoConfig()
+      const urls = getZohoBaseUrls(config.region)
+      this._baseUrl = urls.books
+      this._organizationId = config.organizationId
+    }
+    return this._baseUrl
+  }
+
+  private get organizationId(): string {
+    if (!this._organizationId) {
+      const config = getZohoConfig()
+      this._organizationId = config.organizationId
+    }
+    return this._organizationId
   }
 
   private getUrl(endpoint: string): string {

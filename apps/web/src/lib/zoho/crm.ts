@@ -31,12 +31,15 @@ export interface ZohoCrmCreateContact {
 }
 
 class ZohoCrmClient {
-  private baseUrl: string
+  private _baseUrl: string | null = null
 
-  constructor() {
-    const config = getZohoConfig()
-    const urls = getZohoBaseUrls(config.region)
-    this.baseUrl = urls.crm
+  private get baseUrl(): string {
+    if (!this._baseUrl) {
+      const config = getZohoConfig()
+      const urls = getZohoBaseUrls(config.region)
+      this._baseUrl = urls.crm
+    }
+    return this._baseUrl
   }
 
   // ============ CONTACTS ============

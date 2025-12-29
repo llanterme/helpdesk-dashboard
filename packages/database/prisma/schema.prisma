@@ -108,6 +108,13 @@ model Ticket {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
+  // Zoho Desk Integration
+  zohoDeskTicketId  String?   @unique // Zoho Desk Ticket ID
+  zohoDeskContactId String?   // Zoho Desk Contact ID
+  zohoSyncedAt      DateTime? // Last sync timestamp
+  zohoSyncStatus    SyncStatus @default(PENDING)
+  zohoSyncError     String?   // Last sync error message
+
   // Relations
   client   Client    @relation(fields: [clientId], references: [id])
   agent    Agent?    @relation(fields: [agentId], references: [id])
