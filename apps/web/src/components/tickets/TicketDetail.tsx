@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { Listbox, Transition } from '@headlessui/react'
-import { ChevronUpDownIcon, CheckIcon, EnvelopeIcon, PhoneIcon } from '@heroicons/react/24/outline'
+import { ChevronUpDownIcon, CheckIcon, EnvelopeIcon, PhoneIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { useTicketStore, TicketWithRelations } from '@/stores/ticketStore'
 import { useAgentStore } from '@/stores/agentStore'
 import { TicketStatus, TicketPriority } from '@helpdesk/database'
@@ -18,6 +18,7 @@ import {
 } from '@/lib/utils'
 import { MessageThread } from '@/components/messages/MessageThread'
 import { MessageComposer } from '@/components/messages/MessageComposer'
+import { EmailComposer } from '@/components/email/EmailComposer'
 
 const statusOptions = [
   { value: 'OPEN' as TicketStatus, label: 'Open' },
@@ -41,6 +42,7 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
   const { updateTicket } = useTicketStore()
   const { agents } = useAgentStore()
   const [isUpdating, setIsUpdating] = useState(false)
+  const [showEmailComposer, setShowEmailComposer] = useState(false)
 
   if (!ticket) {
     return (
@@ -358,11 +360,43 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
           className="flex-1"
         />
 
-        {/* Message Composer */}
-        <MessageComposer
-          ticketId={ticket.id}
-          placeholder={`Reply to ${ticket.client.name}...`}
-        />
+        {/* Message Composer - with Email Reply option for EMAIL channel */}
+        <div className="border-t border-gray-200">
+          {ticket.channel === 'EMAIL' && (
+            <div className="px-4 py-2 bg-blue-50 flex items-center justify-between">
+              <span className="text-sm text-blue-700">
+                This is an email ticket. You can reply via email or internal note.
+              </span>
+              <button
+                onClick={() => setShowEmailComposer(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+              >
+                <PaperAirplaneIcon className="w-4 h-4" />
+                Reply via Email
+              </button>
+            </div>
+          )}
+          <MessageComposer
+            ticketId={ticket.id}
+            placeholder={ticket.channel === 'EMAIL' ? `Add internal note for ${ticket.client.name}...` : `Reply to ${ticket.client.name}...`}
+          />
+        </div>
+
+        {/* Email Composer Modal */}
+        {showEmailComposer && (
+          <EmailComposer
+            mode="reply"
+            ticketId={ticket.id}
+            clientEmail={ticket.client.email}
+            subject={ticket.subject}
+            onClose={() => setShowEmailComposer(false)}
+            onSent={() => {
+              setShowEmailComposer(false)
+              // Refresh messages
+              window.location.reload()
+            }}
+          />
+        )}
       </div>
 
       {/* Client Sidebar */}

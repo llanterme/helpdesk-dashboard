@@ -38,15 +38,16 @@ helpdesk-dashboard/
 └── helpdesk-dashboard.jsx      # Original 2,866-line React POC
 ```
 
-### Database Schema (14 Models)
+### Database Schema (17 Models)
 - **Users & Auth**: `User`, `Agent`
 - **Contacts**: `Client` (with Zoho CRM/Books sync)
 - **Services**: `Service` (with Zoho Books sync)
-- **Tickets**: `Ticket`, `Message`
+- **Tickets**: `Ticket`, `Message`, `Attachment`
 - **Quotes**: `Quote`, `QuoteItem`, `QuoteStatusLog`
 - **Invoices**: `Invoice`, `InvoiceItem`
 - **Billing**: `Bill`, `BillItem`
 - **Sync**: `SyncLog` (audit trail for Zoho sync)
+- **Email**: `EmailAccount`, `EmailTemplate`
 
 ### Key Enums
 - `TicketChannel`: WHATSAPP, EMAIL, FORM, CHAT
@@ -98,7 +99,7 @@ helpdesk-dashboard/
 
 ### Completed Tasks
 - **Task 01**: Project Setup & Infrastructure
-- **Task 02**: Database Schema (Prisma with 14 models)
+- **Task 02**: Database Schema (Prisma with 17 models)
 - **Task 03**: Authentication System (NextAuth.js)
 - **Task 04**: Core Dashboard Layout
 - **Task 05**: Ticket Management (multi-channel)
@@ -108,17 +109,17 @@ helpdesk-dashboard/
 - **Task 09**: Service Catalog (36+ services from Zoho Books)
 - **Task 10**: Quote Builder (line items, status workflow, Zoho Estimates)
 - **Task 11**: Invoice System (payments, Zoho Invoices)
+- **Task 14**: Email Integration (Microsoft Graph API)
 
 ### In Progress
 - **Task 12**: Commission System & Agent Billing
 
 ### Planned
 - **Task 13**: Dashboard Analytics
-- **Task 14**: Email Integration (Outlook Graph API)
 - **Task 15**: WhatsApp Integration (Business API)
 
 ### Current Phase
-**Status**: ~85% Complete
+**Status**: ~90% Complete
 **Next Step**: Complete Task 12 - Commission System
 
 ## API Routes Structure
@@ -133,7 +134,18 @@ helpdesk-dashboard/
 ├── quotes/*               # Quote CRUD + status workflow
 ├── invoices/*             # Invoice CRUD + payments
 ├── messages/*             # Message CRUD + attachments
-├── webhooks/*             # WhatsApp, Form, Chat webhooks
+├── webhooks/
+│   ├── whatsapp           # WhatsApp webhook
+│   ├── form               # Form submission webhook
+│   ├── chat               # Live chat webhook
+│   ├── zoho-desk          # Zoho Desk webhook
+│   └── email              # Microsoft Graph email webhook
+├── email/
+│   ├── accounts           # Email account CRUD
+│   ├── callback           # Microsoft OAuth callback
+│   ├── inbox              # Unified inbox API
+│   ├── send               # Send email (reply, quote, invoice)
+│   └── templates          # Email template CRUD
 ├── whatsapp/*             # WhatsApp send, templates
 ├── zoho/
 │   ├── callback           # OAuth callback
@@ -152,7 +164,7 @@ helpdesk-dashboard/
 - `serviceStore.ts` - Service catalog state
 
 ## Patterns & Standards
-- **Components**: Organized by domain (tickets, clients, agents, messages, quotes, invoices, zoho)
+- **Components**: Organized by domain (tickets, clients, agents, messages, quotes, invoices, zoho, email)
 - **State**: Zustand stores for client state, React Query for server state
 - **API**: RESTful endpoints following `/api/[resource]` pattern
 - **Types**: Shared TypeScript definitions in packages/shared
@@ -163,7 +175,10 @@ helpdesk-dashboard/
 - **Auth Config**: `apps/web/src/lib/auth.ts`
 - **Zoho Integration**: `apps/web/src/lib/zoho/` (config, auth, books, crm, sync)
 - **Zoho Components**: `apps/web/src/components/zoho/`
+- **Email Integration**: `apps/web/src/lib/email/` (microsoft-graph, email-processor, email-sender)
+- **Email Components**: `apps/web/src/components/email/`
 - **Integration Design**: `docs/INTEGRATION_DESIGN.md`
+- **Email Integration Design**: `docs/EMAIL_INTEGRATION_ANALYSIS.md`
 - **WhatsApp Helpers**: `apps/web/src/lib/whatsapp.ts`
 - **Main Layout**: `apps/web/src/components/layout/dashboard-layout.tsx`
 
@@ -172,6 +187,7 @@ See `.env.example` for required configuration:
 - Database connection (DATABASE_URL - PostgreSQL)
 - NextAuth secrets (NEXTAUTH_SECRET, NEXTAUTH_URL)
 - Zoho integration (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN, ZOHO_ORGANIZATION_ID, ZOHO_REGION)
+- Microsoft Graph (MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET)
 - WhatsApp Business API credentials
 - Webhook API key
 
@@ -188,3 +204,13 @@ See `.env.example` for required configuration:
 - Sync dashboard with status tracking and activity logs
 - Client-facing ticket portal
 - Dashboard overview statistics
+- **Email Integration**:
+  - Microsoft Graph API OAuth2 authentication
+  - Multi-account inbox (info@, support@, sales@)
+  - Automatic ticket creation from incoming emails
+  - Smart client lookup (local DB → Zoho CRM → Zoho Books)
+  - Email thread detection via Message-ID headers
+  - Reply via email from ticket view
+  - Send quotes/invoices via email
+  - Email templates system
+  - Client context panel (quotes, invoices, history)

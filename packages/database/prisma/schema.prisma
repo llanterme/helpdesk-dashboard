@@ -108,6 +108,9 @@ model Ticket {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
+  // Email channel tracking
+  emailAccountId String?       // Which inbox received this ticket
+
   // Zoho Desk Integration
   zohoDeskTicketId  String?   @unique // Zoho Desk Ticket ID
   zohoDeskContactId String?   // Zoho Desk Contact ID
@@ -116,10 +119,12 @@ model Ticket {
   zohoSyncError     String?   // Last sync error message
 
   // Relations
-  client   Client    @relation(fields: [clientId], references: [id])
-  agent    Agent?    @relation(fields: [agentId], references: [id])
-  messages Message[]
+  client       Client        @relation(fields: [clientId], references: [id])
+  agent        Agent?        @relation(fields: [agentId], references: [id])
+  messages     Message[]
+  emailAccount EmailAccount? @relation(fields: [emailAccountId], references: [id])
 
+  @@index([emailAccountId])
   @@map("tickets")
 }
 
@@ -138,10 +143,102 @@ model Message {
   mediaUrl          String?       // URL for media attachments
   mediaType         String?       // image, document, audio, video
 
-  // Relations
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  // Email-specific fields
+  emailMessageId  String?  @unique // Message-ID header for threading
+  emailSubject    String?          // Original email subject
+  emailFrom       String?          // Sender email address
+  emailTo         String[]         // Recipients
+  emailCc         String[]         // CC recipients
+  emailBcc        String[]         // BCC recipients
+  emailInReplyTo  String?          // In-Reply-To header for threading
+  emailReferences String[]         // References header chain
+  emailHtmlBody   String?  @db.Text // Original HTML content
 
+  // Relations
+  ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+
+  @@index([emailMessageId])
+  @@index([emailInReplyTo])
   @@map("messages")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  messageId String
+  filename  String
+  mimeType  String
+  size      Int      // Size in bytes
+  storageUrl String  // S3 or local storage URL
+  storageKey String? // S3 key or storage identifier
+  createdAt DateTime @default(now())
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("attachments")
+}
+
+model EmailAccount {
+  id          String        @id @default(cuid())
+  email       String        @unique
+  displayName String        // e.g., "Easy Services Support"
+  provider    EmailProvider @default(MICROSOFT_365)
+  isActive    Boolean       @default(true)
+  isDefault   Boolean       @default(false) // Default account for sending
+
+  // Microsoft Graph OAuth tokens
+  accessToken     String?   @db.Text
+  refreshToken    String?   @db.Text
+  tokenExpiry     DateTime?
+  tenantId        String?   // Azure AD Tenant ID
+
+  // Webhook subscription (Microsoft Graph)
+  subscriptionId     String?
+  subscriptionExpiry DateTime?
+
+  // Email signature (HTML)
+  signature String? @db.Text
+
+  // Settings
+  autoCreateTickets Boolean @default(true) // Auto-create tickets from incoming emails
+  syncEnabled       Boolean @default(true)
+  lastSyncAt        DateTime?
+  syncError         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tickets        Ticket[]
+  emailTemplates EmailTemplate[]
+
+  @@map("email_accounts")
+}
+
+model EmailTemplate {
+  id             String  @id @default(cuid())
+  name           String
+  subject        String
+  body           String  @db.Text // HTML body
+  category       String? // e.g., "quote", "invoice", "support"
+  isDefault      Boolean @default(false)
+  emailAccountId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  emailAccount EmailAccount? @relation(fields: [emailAccountId], references: [id])
+
+  @@map("email_templates")
+}
+
+enum EmailProvider {
+  MICROSOFT_365
+  GOOGLE_WORKSPACE
+  IMAP_SMTP
 }
 
 enum MessageStatus {
