@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@helpdesk/database'
+import { syncReplyToZohoDesk } from '@/lib/zoho/sync'
+import { isZohoDeskConfigured } from '@/lib/zoho/config'
 
 const prisma = new PrismaClient()
 
@@ -54,16 +56,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const whatsappId = ticket.client.whatsappId
-    if (!whatsappId) {
-      return NextResponse.json(
-        { error: 'Client does not have a WhatsApp ID' },
-        { status: 400 }
-      )
+    let result: { success: boolean; messageId?: string; error?: string }
+    let sentViaZohoDesk = false
+
+    // Try to send via Zoho Desk if ticket is synced (routes through HelloSend)
+    if (ticket.zohoDeskTicketId && isZohoDeskConfigured()) {
+      const zohoResult = await syncReplyToZohoDesk(ticketId, message)
+
+      if (zohoResult.success) {
+        result = {
+          success: true,
+          messageId: zohoResult.threadId,
+        }
+        sentViaZohoDesk = true
+      } else {
+        // Log the error but try direct WhatsApp API as fallback
+        console.warn('Zoho Desk send failed, trying direct API:', zohoResult.error)
+        result = { success: false, error: zohoResult.error }
+      }
+    } else {
+      result = { success: false }
     }
 
-    // Send the message via WhatsApp API
-    const result = await sendWhatsAppMessage(whatsappId, message, templateName, templateParams)
+    // Fallback to direct WhatsApp API if Zoho Desk didn't work
+    if (!result.success) {
+      const whatsappId = ticket.client.whatsappId
+      if (!whatsappId) {
+        return NextResponse.json(
+          { error: 'Client does not have a WhatsApp ID' },
+          { status: 400 }
+        )
+      }
+
+      result = await sendWhatsAppMessage(whatsappId, message, templateName, templateParams)
+    }
 
     if (!result.success) {
       return NextResponse.json(
@@ -95,7 +121,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       messageId: storedMessage.id,
-      whatsappMessageId: result.messageId
+      whatsappMessageId: result.messageId,
+      sentVia: sentViaZohoDesk ? 'zoho_desk' : 'direct_api'
     })
 
   } catch (error) {

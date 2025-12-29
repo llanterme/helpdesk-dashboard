@@ -14,6 +14,7 @@
 import { prisma } from '@/lib/prisma'
 import { zohoBooks, ZohoItem, ZohoContact, ZohoEstimate, ZohoInvoice } from './books'
 import { zohoCrm, ZohoCrmContact } from './crm'
+import { zohoDesk, isZohoDeskConfigured, ZohoDeskTicket, ZohoDeskThread } from './desk'
 import { isZohoConfigured } from './config'
 import { SyncDirection } from '@prisma/client'
 
@@ -959,4 +960,450 @@ export async function getRecentSyncLogs(limit: number = 50): Promise<{
       createdAt: true,
     },
   })
+}
+
+// ============ ZOHO DESK SYNC (WHATSAPP) ============
+
+/**
+ * Map Zoho Desk status to local TicketStatus
+ */
+function mapZohoDeskStatus(zohoStatus: string): 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED' {
+  const statusMap: Record<string, 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED'> = {
+    'Open': 'OPEN',
+    'New': 'OPEN',
+    'On Hold': 'PENDING',
+    'Escalated': 'PENDING',
+    'In Progress': 'PENDING',
+    'Resolved': 'RESOLVED',
+    'Closed': 'CLOSED',
+  }
+  return statusMap[zohoStatus] || 'OPEN'
+}
+
+/**
+ * Map Zoho Desk priority to local TicketPriority
+ */
+function mapZohoDeskPriority(zohoPriority?: string): 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' {
+  const priorityMap: Record<string, 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'> = {
+    'Low': 'LOW',
+    'Medium': 'MEDIUM',
+    'High': 'HIGH',
+    'Urgent': 'URGENT',
+  }
+  return priorityMap[zohoPriority || ''] || 'MEDIUM'
+}
+
+/**
+ * Map local TicketStatus to Zoho Desk status
+ */
+function mapLocalStatusToZohoDesk(localStatus: string): string {
+  const statusMap: Record<string, string> = {
+    'OPEN': 'Open',
+    'PENDING': 'On Hold',
+    'RESOLVED': 'Resolved',
+    'CLOSED': 'Closed',
+  }
+  return statusMap[localStatus] || 'Open'
+}
+
+/**
+ * Sync a single Zoho Desk ticket to local database
+ */
+async function syncDeskTicketToLocal(deskTicket: ZohoDeskTicket): Promise<EntitySyncResult> {
+  try {
+    // Check if ticket exists locally
+    const existingTicket = await prisma.ticket.findUnique({
+      where: { zohoDeskTicketId: deskTicket.id },
+    })
+
+    // Find or create client from contact
+    let clientId: string
+
+    if (deskTicket.contact) {
+      const contact = deskTicket.contact
+      const contactEmail = contact.email ||
+        `whatsapp_${contact.phone || contact.mobile || contact.id}@whatsapp.easyservicesgroup.co.za`
+      const contactPhone = contact.phone || contact.mobile || ''
+
+      let client = await prisma.client.findFirst({
+        where: {
+          OR: [
+            { whatsappId: contactPhone.replace(/\D/g, '') },
+            { email: contactEmail },
+          ],
+        },
+      })
+
+      if (!client) {
+        const contactName = [contact.firstName, contact.lastName]
+          .filter(Boolean)
+          .join(' ') || `WhatsApp User ${contactPhone}`
+
+        client = await prisma.client.create({
+          data: {
+            name: contactName,
+            email: contactEmail,
+            phone: contactPhone || null,
+            whatsappId: contactPhone.replace(/\D/g, '') || null,
+          },
+        })
+      }
+      clientId = client.id
+    } else if (existingTicket) {
+      clientId = existingTicket.clientId
+    } else {
+      // Need to fetch contact from Zoho Desk
+      const contact = await zohoDesk.getContact(deskTicket.contactId)
+      const contactEmail = contact.email ||
+        `whatsapp_${contact.phone || contact.mobile || contact.id}@whatsapp.easyservicesgroup.co.za`
+      const contactPhone = contact.phone || contact.mobile || ''
+
+      let client = await prisma.client.findFirst({
+        where: {
+          OR: [
+            { whatsappId: contactPhone.replace(/\D/g, '') },
+            { email: contactEmail },
+          ],
+        },
+      })
+
+      if (!client) {
+        const contactName = [contact.firstName, contact.lastName]
+          .filter(Boolean)
+          .join(' ') || `WhatsApp User ${contactPhone}`
+
+        client = await prisma.client.create({
+          data: {
+            name: contactName,
+            email: contactEmail,
+            phone: contactPhone || null,
+            whatsappId: contactPhone.replace(/\D/g, '') || null,
+          },
+        })
+      }
+      clientId = client.id
+    }
+
+    const ticketData = {
+      subject: deskTicket.subject || 'WhatsApp Conversation',
+      channel: 'WHATSAPP' as const,
+      status: mapZohoDeskStatus(deskTicket.status),
+      priority: mapZohoDeskPriority(deskTicket.priority),
+      clientId,
+      zohoDeskTicketId: deskTicket.id,
+      zohoDeskContactId: deskTicket.contactId,
+      zohoSyncedAt: new Date(),
+      zohoSyncStatus: 'SYNCED' as const,
+      zohoSyncError: null,
+    }
+
+    if (existingTicket) {
+      await prisma.ticket.update({
+        where: { id: existingTicket.id },
+        data: ticketData,
+      })
+      await logSync('ticket', existingTicket.id, 'FROM_ZOHO', 'success', deskTicket.id)
+      return { success: true, zohoId: deskTicket.id }
+    } else {
+      const newTicket = await prisma.ticket.create({
+        data: {
+          ...ticketData,
+          unread: true,
+        },
+      })
+      await logSync('ticket', newTicket.id, 'FROM_ZOHO', 'success', deskTicket.id)
+      return { success: true, zohoId: deskTicket.id }
+    }
+  } catch (error) {
+    const errorMsg = `Failed to sync Desk ticket ${deskTicket.id}: ${error}`
+    await logSync('ticket', deskTicket.id, 'FROM_ZOHO', 'failed', undefined, errorMsg)
+    return { success: false, error: errorMsg }
+  }
+}
+
+/**
+ * Pull all WhatsApp tickets from Zoho Desk
+ */
+export async function syncTicketsFromZohoDesk(): Promise<SyncResult> {
+  if (!isZohoDeskConfigured()) {
+    return { created: 0, updated: 0, skipped: 0, errors: ['Zoho Desk not configured'] }
+  }
+
+  const result: SyncResult = { created: 0, updated: 0, skipped: 0, errors: [] }
+
+  try {
+    let from = 0
+    const limit = 100
+    let hasMore = true
+
+    while (hasMore) {
+      const response = await zohoDesk.getWhatsAppTickets({ from, limit })
+      const tickets = response.data || []
+
+      if (tickets.length < limit) {
+        hasMore = false
+      }
+
+      for (const ticket of tickets) {
+        // Check if already exists
+        const existing = await prisma.ticket.findUnique({
+          where: { zohoDeskTicketId: ticket.id },
+        })
+
+        const syncResult = await syncDeskTicketToLocal(ticket)
+
+        if (syncResult.success) {
+          if (existing) {
+            result.updated++
+          } else {
+            result.created++
+          }
+        } else {
+          result.errors.push(syncResult.error || 'Unknown error')
+        }
+      }
+
+      from += limit
+    }
+  } catch (error) {
+    result.errors.push(`Failed to fetch Zoho Desk tickets: ${error}`)
+  }
+
+  return result
+}
+
+/**
+ * Sync threads (messages) for a specific ticket from Zoho Desk
+ */
+export async function syncThreadsFromZohoDesk(ticketId: string): Promise<SyncResult> {
+  if (!isZohoDeskConfigured()) {
+    return { created: 0, updated: 0, skipped: 0, errors: ['Zoho Desk not configured'] }
+  }
+
+  const result: SyncResult = { created: 0, updated: 0, skipped: 0, errors: [] }
+
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: { client: true },
+    })
+
+    if (!ticket?.zohoDeskTicketId) {
+      result.errors.push('Ticket not synced to Zoho Desk')
+      return result
+    }
+
+    const response = await zohoDesk.getThreads(ticket.zohoDeskTicketId, { limit: 100 })
+    const threads = response.data || []
+
+    for (const thread of threads) {
+      // Check for existing message (by content and approximate timestamp)
+      const threadTime = new Date(thread.createdTime)
+      const existingMessage = await prisma.message.findFirst({
+        where: {
+          ticketId: ticket.id,
+          content: thread.content,
+          timestamp: {
+            gte: new Date(threadTime.getTime() - 5000),
+            lte: new Date(threadTime.getTime() + 5000),
+          },
+        },
+      })
+
+      if (existingMessage) {
+        result.skipped++
+        continue
+      }
+
+      // Determine sender type
+      const isFromClient = thread.direction === 'in' || thread.author?.type === 'CONTACT'
+
+      await prisma.message.create({
+        data: {
+          ticketId: ticket.id,
+          senderType: isFromClient ? 'CLIENT' : 'AGENT',
+          senderId: isFromClient ? ticket.clientId : (thread.author?.id || null),
+          content: thread.content,
+          read: !isFromClient,
+          timestamp: threadTime,
+        },
+      })
+
+      result.created++
+
+      // Mark ticket as unread if client message
+      if (isFromClient) {
+        await prisma.ticket.update({
+          where: { id: ticket.id },
+          data: { unread: true },
+        })
+      }
+    }
+
+    await logSync('ticket', ticketId, 'FROM_ZOHO', 'success', ticket.zohoDeskTicketId)
+  } catch (error) {
+    result.errors.push(`Failed to sync threads: ${error}`)
+    await logSync('ticket', ticketId, 'FROM_ZOHO', 'failed', undefined, `${error}`)
+  }
+
+  return result
+}
+
+/**
+ * Send a reply to Zoho Desk (which routes to WhatsApp via HelloSend)
+ */
+export async function syncReplyToZohoDesk(
+  ticketId: string,
+  content: string
+): Promise<EntitySyncResult & { threadId?: string }> {
+  if (!isZohoDeskConfigured()) {
+    return { success: false, error: 'Zoho Desk not configured' }
+  }
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+  })
+
+  if (!ticket?.zohoDeskTicketId) {
+    return { success: false, error: 'Ticket not synced to Zoho Desk' }
+  }
+
+  try {
+    // Send reply via Zoho Desk API (routes to WhatsApp via HelloSend)
+    const thread = await zohoDesk.sendWhatsAppReply(ticket.zohoDeskTicketId, content)
+
+    await logSync('message', ticketId, 'TO_ZOHO', 'success', thread.id)
+
+    return {
+      success: true,
+      zohoId: thread.id,
+      threadId: thread.id,
+    }
+  } catch (error) {
+    const errorMsg = `Failed to send reply to Zoho Desk: ${error}`
+    await logSync('message', ticketId, 'TO_ZOHO', 'failed', undefined, errorMsg)
+    return { success: false, error: errorMsg }
+  }
+}
+
+/**
+ * Update ticket status in Zoho Desk
+ */
+export async function syncTicketStatusToZohoDesk(ticketId: string): Promise<EntitySyncResult> {
+  if (!isZohoDeskConfigured()) {
+    return { success: false, error: 'Zoho Desk not configured' }
+  }
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+  })
+
+  if (!ticket?.zohoDeskTicketId) {
+    return { success: false, error: 'Ticket not synced to Zoho Desk' }
+  }
+
+  try {
+    const zohoStatus = mapLocalStatusToZohoDesk(ticket.status)
+    await zohoDesk.updateTicket(ticket.zohoDeskTicketId, { status: zohoStatus })
+
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: {
+        zohoSyncedAt: new Date(),
+        zohoSyncStatus: 'SYNCED',
+        zohoSyncError: null,
+      },
+    })
+
+    await logSync('ticket', ticketId, 'TO_ZOHO', 'success', ticket.zohoDeskTicketId)
+    return { success: true, zohoId: ticket.zohoDeskTicketId }
+  } catch (error) {
+    const errorMsg = `Failed to update ticket status in Zoho Desk: ${error}`
+
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: {
+        zohoSyncStatus: 'FAILED',
+        zohoSyncError: errorMsg,
+      },
+    })
+
+    await logSync('ticket', ticketId, 'TO_ZOHO', 'failed', ticket.zohoDeskTicketId, errorMsg)
+    return { success: false, error: errorMsg }
+  }
+}
+
+/**
+ * Close ticket in Zoho Desk
+ */
+export async function closeTicketInZohoDesk(ticketId: string): Promise<EntitySyncResult> {
+  if (!isZohoDeskConfigured()) {
+    return { success: false, error: 'Zoho Desk not configured' }
+  }
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+  })
+
+  if (!ticket?.zohoDeskTicketId) {
+    return { success: false, error: 'Ticket not synced to Zoho Desk' }
+  }
+
+  try {
+    await zohoDesk.closeTicket(ticket.zohoDeskTicketId)
+
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: {
+        status: 'CLOSED',
+        zohoSyncedAt: new Date(),
+        zohoSyncStatus: 'SYNCED',
+        zohoSyncError: null,
+      },
+    })
+
+    await logSync('ticket', ticketId, 'TO_ZOHO', 'success', ticket.zohoDeskTicketId)
+    return { success: true, zohoId: ticket.zohoDeskTicketId }
+  } catch (error) {
+    const errorMsg = `Failed to close ticket in Zoho Desk: ${error}`
+    await logSync('ticket', ticketId, 'TO_ZOHO', 'failed', ticket.zohoDeskTicketId, errorMsg)
+    return { success: false, error: errorMsg }
+  }
+}
+
+/**
+ * Run full sync from Zoho Desk (tickets and threads)
+ */
+export async function runFullSyncFromZohoDesk(): Promise<{
+  tickets: SyncResult
+  threads: { synced: number; errors: string[] }
+  timestamp: Date
+}> {
+  const timestamp = new Date()
+
+  // Sync all WhatsApp tickets
+  const tickets = await syncTicketsFromZohoDesk()
+
+  // Sync threads for all synced tickets
+  const threadResults = { synced: 0, errors: [] as string[] }
+
+  const syncedTickets = await prisma.ticket.findMany({
+    where: {
+      channel: 'WHATSAPP',
+      zohoDeskTicketId: { not: null },
+    },
+    select: { id: true },
+  })
+
+  for (const ticket of syncedTickets) {
+    const threadResult = await syncThreadsFromZohoDesk(ticket.id)
+    threadResults.synced += threadResult.created
+    threadResults.errors.push(...threadResult.errors)
+  }
+
+  return {
+    tickets,
+    threads: threadResults,
+    timestamp,
+  }
 }
