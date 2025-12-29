@@ -12,6 +12,7 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   CurrencyDollarIcon,
+  Squares2X2Icon,
 } from '@heroicons/react/24/outline'
 
 type NavigationItem = {
@@ -27,6 +28,7 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Projects', href: '/projects', icon: Squares2X2Icon },
   {
     name: 'Tickets',
     href: '/tickets',
