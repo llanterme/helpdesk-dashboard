@@ -14,17 +14,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Find ticket by reference number and verify client email
+    // Find ticket by ID and verify client email
     const ticket = await prisma.ticket.findFirst({
       where: {
-        ticketNumber: ref.toUpperCase(),
+        id: ref,
         client: {
           email: email.toLowerCase(),
         },
       },
       select: {
         id: true,
-        ticketNumber: true,
+        subject: true,
       },
     })
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ticketId: ticket.id,
-      ticketNumber: ticket.ticketNumber,
+      ticketReference: ticket.id,
     })
   } catch (error) {
     console.error('Portal lookup error:', error)

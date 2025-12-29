@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         category: category.trim(),
         description: description?.trim() || null,
-        rate: parseFloat(rate),
+        rate: rate,
         unit: unit.trim(),
         sku: serviceSku,
         active: active !== false // Default to true if not specified

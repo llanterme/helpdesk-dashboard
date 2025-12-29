@@ -20,16 +20,17 @@ import {
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline'
 
-interface QuoteBuilderProps {
+export interface QuoteBuilderProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: (quote: any) => void
   editQuote?: any // For editing existing quotes
+  duplicateQuote?: any // For duplicating existing quotes (creates new quote with same data)
 }
 
 type Step = 'client' | 'services' | 'settings' | 'review'
 
-export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote }: QuoteBuilderProps) {
+export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote, duplicateQuote }: QuoteBuilderProps) {
   const [currentStep, setCurrentStep] = useState<Step>('client')
   const [selectedClientId, setSelectedClientId] = useState('')
   const [selectedAgentId, setSelectedAgentId] = useState('')
@@ -59,29 +60,31 @@ export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote }: QuoteBui
   // Initialize data
   useEffect(() => {
     if (isOpen) {
+      // Use editQuote or duplicateQuote as the source data
+      const sourceQuote = editQuote || duplicateQuote
 
-      // Initialize for editing
-      if (editQuote) {
-        setSelectedClientId(editQuote.clientId)
-        setSelectedAgentId(editQuote.agentId || '')
-        initializeCart(editQuote.clientId, editQuote.agentId)
+      // Initialize for editing or duplicating
+      if (sourceQuote) {
+        setSelectedClientId(sourceQuote.clientId)
+        setSelectedAgentId(sourceQuote.agentId || '')
+        initializeCart(sourceQuote.clientId, sourceQuote.agentId)
 
         // Populate cart with existing items
-        editQuote.items.forEach((item: any) => {
+        sourceQuote.items.forEach((item: any) => {
           addToCart(item.serviceId, item.quantity, item.rate, item.customDescription)
         })
 
         // Set cart settings
         updateCartSettings({
-          taxRate: editQuote.taxRate,
-          discountRate: editQuote.discountRate,
-          notes: editQuote.notes,
-          terms: editQuote.terms,
-          validUntil: editQuote.validUntil?.split('T')[0] // Format for date input
+          taxRate: sourceQuote.taxRate,
+          discountRate: sourceQuote.discountRate,
+          notes: sourceQuote.notes,
+          terms: sourceQuote.terms,
+          validUntil: sourceQuote.validUntil?.split('T')[0] // Format for date input
         })
       }
     }
-  }, [isOpen, editQuote])
+  }, [isOpen, editQuote, duplicateQuote])
 
   // Reset when closing
   const handleClose = () => {
@@ -157,7 +160,7 @@ export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote }: QuoteBui
     if (!canFinalize) return
 
     try {
-      const quoteData = {
+      const quoteData: any = {
         clientId: selectedClientId,
         agentId: selectedAgentId || undefined,
         items: cart.items,
@@ -169,9 +172,11 @@ export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote }: QuoteBui
       }
 
       let result
-      if (editQuote) {
+      if (editQuote && !duplicateQuote) {
+        // Only update if editing (not duplicating)
         result = await updateQuote(editQuote.id, quoteData)
       } else {
+        // Create new quote (either fresh or duplicate)
         result = await createQuote(quoteData)
       }
 
@@ -192,7 +197,7 @@ export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote }: QuoteBui
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">
-              {editQuote ? 'Edit Quote' : 'Create New Quote'}
+              {editQuote ? 'Edit Quote' : duplicateQuote ? 'Duplicate Quote' : 'Create New Quote'}
             </h2>
             <button
               onClick={handleClose}
@@ -703,7 +708,7 @@ export function QuoteBuilder({ isOpen, onClose, onSuccess, editQuote }: QuoteBui
                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 <DocumentTextIcon className="h-4 w-4 mr-2" />
-                {isLoading ? 'Creating...' : (editQuote ? 'Update Quote' : 'Create Quote')}
+                {isLoading ? 'Creating...' : (editQuote ? 'Update Quote' : duplicateQuote ? 'Create Duplicate' : 'Create Quote')}
               </button>
             )}
           </div>

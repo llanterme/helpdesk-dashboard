@@ -31,8 +31,7 @@ export async function GET(
             name: true,
             company: true,
             email: true,
-            phone: true,
-            address: true
+            phone: true
           }
         },
         agent: {

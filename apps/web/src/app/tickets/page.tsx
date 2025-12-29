@@ -14,7 +14,7 @@ export default function TicketsPage() {
     <DashboardLayout>
       <div className="flex h-full">
         <TicketList />
-        <TicketDetail ticket={selectedTicket} />
+        <TicketDetail ticket={selectedTicket ?? undefined} />
       </div>
     </DashboardLayout>
   )

@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       include: { client: true }
     })
 
-    let client = ticket?.client
+    let client = ticket?.client ?? null
 
     // If no existing ticket, create client and ticket
     if (!ticket) {

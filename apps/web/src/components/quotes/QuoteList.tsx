@@ -91,7 +91,6 @@ export function QuoteList({
     filters,
     fetchQuotes,
     setFilters,
-    clearFilters,
     clearError
   } = useQuoteStore()
 

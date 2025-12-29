@@ -227,12 +227,10 @@ export function ServiceForm({
   }
 
   // Get category options
-  const categoryOptions = [
-    ...new Set([
-      ...categories.map(cat => cat.name),
-      ...(formData.category ? [formData.category] : [])
-    ])
-  ].sort()
+  const categoryOptions = Array.from(new Set([
+    ...categories.map(cat => cat.name),
+    ...(formData.category ? [formData.category] : [])
+  ])).sort()
 
   if (!isOpen) return null
 

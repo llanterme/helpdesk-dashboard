@@ -455,7 +455,7 @@ export const useMessageStore = create<MessageStore>()(
         set(state => {
           const indicators = state.typingIndicators[ticketId] || []
 
-          let updatedIndicators
+          let updatedIndicators: typeof indicators
           if (senderName) {
             updatedIndicators = indicators.filter(i => i.senderName !== senderName)
           } else {

@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncInvoiceToZoho, syncInvoiceStatusToZoho } from '@/lib/zoho/sync'
+import {
+  syncInvoiceToZoho,
+  syncInvoiceStatusToZoho,
+  syncPaymentToZoho,
+} from '@/lib/zoho/sync'
 import { isZohoConfigured } from '@/lib/zoho/config'
 
 /**
  * POST /api/zoho/sync/invoices
  * Sync an invoice to Zoho Books
  *
- * Body: { invoiceId: string, statusOnly?: boolean }
+ * Body:
+ *   { invoiceId: string } - Full sync of invoice to Zoho
+ *   { invoiceId: string, statusOnly: true } - Only sync status
+ *   { invoiceId: string, payment: { amount, date, mode } } - Record payment
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { invoiceId, statusOnly } = body
+    const { invoiceId, statusOnly, payment } = body
 
     if (!invoiceId) {
       return NextResponse.json(
@@ -27,33 +34,63 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Record payment
+    if (payment) {
+      const { amount, date, mode } = payment
+
+      if (!amount) {
+        return NextResponse.json(
+          { error: 'payment.amount is required' },
+          { status: 400 }
+        )
+      }
+
+      const result = await syncPaymentToZoho(
+        invoiceId,
+        amount,
+        date ? new Date(date) : new Date(),
+        mode || 'bank_transfer'
+      )
+
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Payment recorded in Zoho',
+        paymentId: result.paymentId,
+      })
+    }
+
+    // Only sync status
     if (statusOnly) {
-      // Only sync status
       const result = await syncInvoiceStatusToZoho(invoiceId)
 
-      if (result.error) {
+      if (!result.success) {
         return NextResponse.json({ error: result.error }, { status: 400 })
       }
 
       return NextResponse.json({
         success: true,
         message: 'Invoice status synced to Zoho',
-      })
-    } else {
-      // Full sync
-      const result = await syncInvoiceToZoho(invoiceId)
-
-      if (result.error) {
-        return NextResponse.json({ error: result.error }, { status: 400 })
-      }
-
-      return NextResponse.json({
-        success: true,
-        invoiceId,
-        zohoBooksInvoiceId: result.zohoInvoiceId,
-        zohoInvoiceNumber: result.invoiceNumber,
+        zohoId: result.zohoId,
       })
     }
+
+    // Full sync
+    const result = await syncInvoiceToZoho(invoiceId)
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      invoiceId,
+      zohoBooksInvoiceId: result.zohoInvoiceId,
+      zohoInvoiceNumber: result.invoiceNumber,
+    })
   } catch (error) {
     console.error('Invoice sync error:', error)
     return NextResponse.json(
@@ -65,12 +102,15 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/zoho/sync/invoices
- * Get sync status
+ * Get sync endpoint info
  */
 export async function GET() {
   return NextResponse.json({
     configured: isZohoConfigured(),
-    endpoint: 'POST to sync invoices to Zoho Books',
-    body: '{ invoiceId: string, statusOnly?: boolean }',
+    endpoints: {
+      fullSync: 'POST { invoiceId: "..." }',
+      statusOnly: 'POST { invoiceId: "...", statusOnly: true }',
+      recordPayment: 'POST { invoiceId: "...", payment: { amount, date?, mode? } }',
+    },
   })
 }

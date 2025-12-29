@@ -52,13 +52,12 @@ export async function POST(
         senderType: 'CLIENT',
         senderId: ticket.clientId,
         content: message.trim(),
-        channel: ticket.channel,
         read: false,
       },
     })
 
-    // Update ticket status to show customer responded (if it was waiting)
-    if (ticket.status === 'WAITING') {
+    // Update ticket status to show customer responded (if it was pending)
+    if (ticket.status === 'PENDING') {
       await prisma.ticket.update({
         where: { id: ticket.id },
         data: {

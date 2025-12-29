@@ -13,8 +13,10 @@
     "clean": "turbo run clean"
   },
   "devDependencies": {
+    "@zohocrm/zdk-cli": "^1.0.3-beta",
     "turbo": "^1.10.0",
-    "typescript": "^5.2.0"
+    "typescript": "^5.2.0",
+    "zoho-extension-toolkit": "^1.0.24"
   },
   "packageManager": "npm@9.0.0"
 }

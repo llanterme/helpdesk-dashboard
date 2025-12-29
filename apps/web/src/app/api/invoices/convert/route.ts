@@ -104,8 +104,7 @@ export async function POST(request: NextRequest) {
             name: true,
             company: true,
             email: true,
-            phone: true,
-            address: true
+            phone: true
           }
         },
         agent: {

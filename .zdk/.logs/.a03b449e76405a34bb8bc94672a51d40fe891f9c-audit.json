@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 7
+    },
+    "auditLog": "/Users/user/Easy Services Help Desk/helpdesk-dashboard/.zdk/.logs/.a03b449e76405a34bb8bc94672a51d40fe891f9c-audit.json",
+    "files": [
+        {
+            "date": 1766999203879,
+            "name": "/Users/user/Easy Services Help Desk/helpdesk-dashboard/.zdk/.logs/ZDK-CLI-2025-12-29.log",
+            "hash": "8fdbc33896f32689bdd01575024040f2e74c841368a4330e6b4adfba683d27df"
+        }
+    ],
+    "hashType": "sha256"
+}

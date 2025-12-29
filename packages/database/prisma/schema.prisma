@@ -58,9 +58,11 @@ model Client {
   updatedAt   DateTime @updatedAt
 
   // Zoho Integration IDs
-  zohoCrmContactId   String?  @unique // Zoho CRM Contact ID
-  zohoBooksContactId String?  @unique // Zoho Books Contact ID
-  zohoSyncedAt       DateTime? // Last sync timestamp
+  zohoCrmContactId   String?    @unique // Zoho CRM Contact ID
+  zohoBooksContactId String?    @unique // Zoho Books Contact ID
+  zohoSyncedAt       DateTime?  // Last sync timestamp
+  zohoSyncStatus     SyncStatus @default(PENDING)
+  zohoSyncError      String?    @db.Text
 
   // Relations
   tickets  Ticket[]
@@ -83,8 +85,9 @@ model Service {
   updatedAt   DateTime @updatedAt
 
   // Zoho Books Integration
-  zohoBooksItemId String?   @unique // Zoho Books Item ID
-  zohoSyncedAt    DateTime? // Last sync timestamp
+  zohoBooksItemId String?    @unique // Zoho Books Item ID
+  zohoSyncedAt    DateTime?  // Last sync timestamp
+  zohoSyncStatus  SyncStatus @default(PENDING)
 
   // Relations
   quoteItems   QuoteItem[]
@@ -163,8 +166,11 @@ model Quote {
   updatedAt      DateTime    @updatedAt
 
   // Zoho Books Integration
-  zohoBooksEstimateId String?   @unique // Zoho Books Estimate ID
-  zohoSyncedAt        DateTime? // Last sync timestamp
+  zohoBooksEstimateId String?    @unique // Zoho Books Estimate ID
+  zohoCrmDealId       String?    @unique // Zoho CRM Deal ID
+  zohoSyncedAt        DateTime?  // Last sync timestamp
+  zohoSyncStatus      SyncStatus @default(PENDING)
+  zohoSyncError       String?    @db.Text
 
   // Relations
   client     Client            @relation(fields: [clientId], references: [id])
@@ -223,8 +229,11 @@ model Invoice {
   updatedAt   DateTime      @updatedAt
 
   // Zoho Books Integration
-  zohoBooksInvoiceId String?   @unique // Zoho Books Invoice ID
-  zohoSyncedAt       DateTime? // Last sync timestamp
+  zohoBooksInvoiceId String?    @unique // Zoho Books Invoice ID
+  zohoSyncedAt       DateTime?  // Last sync timestamp
+  zohoSyncStatus     SyncStatus @default(PENDING)
+  zohoSyncError      String?    @db.Text
+  zohoPaymentId      String?    // Zoho Books Payment ID (when paid)
 
   // Relations
   quote  Quote?        @relation(fields: [quoteId], references: [id])
@@ -345,4 +354,34 @@ enum BillStatus {
   DRAFT
   SENT
   PAID
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  CONFLICT
+}
+
+enum SyncDirection {
+  TO_ZOHO
+  FROM_ZOHO
+}
+
+// Sync audit log for tracking all Zoho synchronization
+model SyncLog {
+  id           String        @id @default(cuid())
+  entityType   String        // 'client', 'service', 'quote', 'invoice'
+  entityId     String
+  direction    SyncDirection
+  status       String        // 'success', 'failed', 'skipped'
+  zohoId       String?
+  errorMessage String?       @db.Text
+  requestBody  Json?
+  responseBody Json?
+  createdAt    DateTime      @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("sync_logs")
 }

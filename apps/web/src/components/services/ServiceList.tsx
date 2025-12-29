@@ -392,7 +392,7 @@ export function ServiceList({
                 onView={onViewService}
                 onEdit={onEditService}
                 onDelete={onDeleteService}
-                onToggleStatus={toggleServiceStatus}
+                onToggleStatus={(service) => toggleServiceStatus(service.id)}
                 onAddToQuote={onAddToQuote}
                 className={viewMode === 'list' ? 'w-full' : ''}
               />

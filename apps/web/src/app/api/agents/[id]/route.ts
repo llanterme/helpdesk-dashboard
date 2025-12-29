@@ -283,7 +283,7 @@ async function calculatePerformanceMetrics(agentId: string) {
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-  const [totalTickets, resolvedTickets, avgResponseTime, recentTickets] = await Promise.all([
+  const [totalTickets, resolvedTickets, recentTickets] = await Promise.all([
     prisma.ticket.count({
       where: { agentId }
     }),
@@ -291,16 +291,6 @@ async function calculatePerformanceMetrics(agentId: string) {
       where: {
         agentId,
         status: { in: ['RESOLVED', 'CLOSED'] }
-      }
-    }),
-    // This is a simplified calculation - in a real system you'd track actual response times
-    prisma.ticket.aggregate({
-      where: {
-        agentId,
-        updatedAt: { gte: thirtyDaysAgo }
-      },
-      _avg: {
-        // Using created/updated time difference as a proxy
       }
     }),
     prisma.ticket.count({

@@ -505,6 +505,55 @@ class ZohoBooksClient {
       throw new Error(`Failed to void Zoho invoice`)
     }
   }
+
+  // ============ PAYMENTS ============
+
+  async recordPayment(payment: {
+    customer_id: string
+    payment_mode: string
+    amount: number
+    date: string
+    invoices: Array<{
+      invoice_id: string
+      amount_applied: number
+    }>
+    reference_number?: string
+    description?: string
+  }): Promise<{ payment_id: string; payment_number: string }> {
+    const response = await zohoFetch(this.getUrl('/customerpayments'), {
+      method: 'POST',
+      body: JSON.stringify(payment),
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to record payment: ${error}`)
+    }
+
+    const data = await response.json()
+    return {
+      payment_id: data.payment.payment_id,
+      payment_number: data.payment.payment_number,
+    }
+  }
+
+  async getPayment(paymentId: string): Promise<{
+    payment_id: string
+    payment_number: string
+    customer_id: string
+    amount: number
+    date: string
+    payment_mode: string
+  }> {
+    const response = await zohoFetch(this.getUrl(`/customerpayments/${paymentId}`))
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch payment ${paymentId}`)
+    }
+
+    const data = await response.json()
+    return data.payment
+  }
 }
 
 // Export singleton instance

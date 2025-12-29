@@ -75,7 +75,7 @@ export async function PUT(
       }
 
       // Update quote
-      const quote = await tx.quote.update({
+      const updated = await tx.quote.update({
         where: { id: params.id },
         data: updateData
       })
@@ -90,7 +90,7 @@ export async function PUT(
         }
       })
 
-      return quote
+      return updated
     })
 
     // Fetch complete quote with relations

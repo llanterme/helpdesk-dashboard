@@ -64,7 +64,7 @@ export async function GET(
 
     return NextResponse.json({
       id: ticket.id,
-      ticketNumber: ticket.ticketNumber,
+      ticketNumber: ticket.id, // Use ID as ticket reference
       subject: ticket.subject,
       status: ticket.status,
       priority: ticket.priority,

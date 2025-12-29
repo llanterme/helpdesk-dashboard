@@ -117,7 +117,7 @@ export function TicketDetail({ ticket }: TicketDetailProps) {
       })
 
       if (response.ok) {
-        updateTicket(ticket.id, { agentId: agent.id, agent: agent.id ? agent : null })
+        updateTicket(ticket.id, { agentId: agent.id })
       }
     } catch (error) {
       console.error('Error assigning ticket:', error)

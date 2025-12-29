@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncClientToZoho, syncAllClientsToZoho } from '@/lib/zoho/sync'
+import {
+  syncClientToZoho,
+  syncAllClientsToZoho,
+  syncClientsFromZoho,
+} from '@/lib/zoho/sync'
 import { isZohoConfigured } from '@/lib/zoho/config'
 
 /**
  * POST /api/zoho/sync/clients
- * Sync clients to Zoho Books and CRM
+ * Sync clients between Zoho and helpdesk
  *
- * Body: { clientId?: string } - If provided, sync single client; otherwise sync all unsynced
+ * Body:
+ *   { clientId?: string } - Sync single client to Zoho
+ *   { direction: 'from_zoho' } - Pull all clients from Zoho Books
+ *   { direction: 'to_zoho' } - Push all unsynced clients to Zoho
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,13 +25,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { clientId } = body
+    const { clientId, direction } = body
 
+    // Pull from Zoho
+    if (direction === 'from_zoho') {
+      const result = await syncClientsFromZoho()
+      return NextResponse.json({
+        success: true,
+        direction: 'from_zoho',
+        message: `Pulled ${result.created} new clients, updated ${result.updated}, skipped ${result.skipped}`,
+        ...result,
+      })
+    }
+
+    // Sync single client to Zoho
     if (clientId) {
-      // Sync single client
       const result = await syncClientToZoho(clientId)
 
-      if (result.error) {
+      if (!result.success) {
         return NextResponse.json(
           { error: result.error },
           { status: 400 }
@@ -37,20 +55,21 @@ export async function POST(request: NextRequest) {
         zohoBooksContactId: result.booksContactId,
         zohoCrmContactId: result.crmContactId,
       })
-    } else {
-      // Sync all unsynced clients
-      const result = await syncAllClientsToZoho()
-
-      return NextResponse.json({
-        success: true,
-        message: `Synced ${result.created} new clients, updated ${result.updated} existing`,
-        ...result,
-      })
     }
+
+    // Push all to Zoho (default)
+    const result = await syncAllClientsToZoho()
+
+    return NextResponse.json({
+      success: true,
+      direction: 'to_zoho',
+      message: `Synced ${result.created} new clients, updated ${result.updated} existing`,
+      ...result,
+    })
   } catch (error) {
     console.error('Clients sync error:', error)
     return NextResponse.json(
-      { error: 'Failed to sync clients to Zoho' },
+      { error: 'Failed to sync clients' },
       { status: 500 }
     )
   }
@@ -63,7 +82,10 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     configured: isZohoConfigured(),
-    endpoint: 'POST to sync clients to Zoho Books and CRM',
-    body: '{ clientId?: string } - optional, syncs all if not provided',
+    endpoints: {
+      pullFromZoho: 'POST { direction: "from_zoho" }',
+      pushToZoho: 'POST { direction: "to_zoho" }',
+      syncSingle: 'POST { clientId: "..." }',
+    },
   })
 }

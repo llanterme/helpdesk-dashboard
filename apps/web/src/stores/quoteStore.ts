@@ -130,7 +130,7 @@ interface QuoteStore {
   cacheTimeout: number
 
   // Actions
-  fetchQuotes: () => Promise<void>
+  fetchQuotes: (forceRefresh?: boolean) => Promise<void>
   fetchQuote: (id: string) => Promise<void>
   createQuote: (data: Partial<Quote>) => Promise<Quote>
   updateQuote: (id: string, data: Partial<Quote>) => Promise<Quote>
@@ -391,10 +391,10 @@ export const useQuoteStore = create<QuoteStore>()(
       },
 
       // Fetch quotes with filtering
-      fetchQuotes: async () => {
+      fetchQuotes: async (forceRefresh?: boolean) => {
         const { filters, pagination, isCacheValid } = get()
 
-        if (isCacheValid()) {
+        if (!forceRefresh && isCacheValid()) {
           return
         }
 
@@ -800,7 +800,8 @@ export const useQuoteStore = create<QuoteStore>()(
       calculateCartTotals: () => {
         const subtotal = get().calculateCartSubtotal()
         const { cart } = get()
-        return quoteUtils.calculateTotalAmount(subtotal, cart.taxRate, cart.discountRate)
+        const totals = quoteUtils.calculateTotalAmount(subtotal, cart.taxRate, cart.discountRate)
+        return { subtotal, ...totals }
       },
 
       // Set filters

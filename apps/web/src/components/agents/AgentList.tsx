@@ -87,7 +87,7 @@ export function AgentList() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center text-red-600">
           <p>Error loading agents</p>
-          <p className="text-sm text-gray-500 mt-1">{error}</p>
+          <p className="text-sm text-gray-500 mt-1">{error instanceof Error ? error.message : 'Unknown error'}</p>
         </div>
       </div>
     )

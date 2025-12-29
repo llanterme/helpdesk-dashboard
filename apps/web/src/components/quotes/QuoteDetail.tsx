@@ -395,9 +395,9 @@ export function QuoteDetail({
                                 {service.description}
                               </div>
                             )}
-                            {item.description && (
+                            {item.customDescription && (
                               <div className="text-xs text-blue-600 mt-1 italic">
-                                Note: {item.description}
+                                Note: {item.customDescription}
                               </div>
                             )}
                           </div>
@@ -515,7 +515,7 @@ export function QuoteDetail({
               <div className="flex items-center space-x-3">
                 <div
                   className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                  style={{ backgroundColor: agent.color }}
+                  style={{ backgroundColor: agent.color || '#6B7280' }}
                 >
                   {agent.avatar ? (
                     <img src={agent.avatar} alt={agent.name} className="h-10 w-10 rounded-full object-cover" />
