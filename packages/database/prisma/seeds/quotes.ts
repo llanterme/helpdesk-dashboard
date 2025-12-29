@@ -114,7 +114,7 @@ export async function seedQuotes() {
 
       // 3. Legal consultation package - DRAFT
       {
-        clientId: clients[2]?.id,
+        clientId: clients[0]?.id,
         agentId: agents[0]?.id,
         status: 'DRAFT',
         taxRate: 15.0,
@@ -138,7 +138,7 @@ export async function seedQuotes() {
 
       // 4. Business registration services - SENT
       {
-        clientId: clients[3]?.id || clients[0].id,
+        clientId: clients[1]?.id || clients[0].id,
         agentId: agents[1]?.id,
         status: 'SENT',
         taxRate: 15.0,
@@ -163,7 +163,7 @@ export async function seedQuotes() {
 
       // 5. High-value document preparation - ACCEPTED
       {
-        clientId: clients[4]?.id || clients[1].id,
+        clientId: clients[0]?.id || clients[1].id,
         agentId: agents[0]?.id,
         status: 'ACCEPTED',
         taxRate: 15.0,
@@ -197,7 +197,7 @@ export async function seedQuotes() {
 
       // 6. Rejected quote for comparison
       {
-        clientId: clients[2]?.id,
+        clientId: clients[1]?.id || clients[0].id,
         agentId: agents[1]?.id,
         status: 'REJECTED',
         taxRate: 15.0,
@@ -237,7 +237,7 @@ export async function seedQuotes() {
 
       // 8. Simple notarization - PENDING
       {
-        clientId: clients[3]?.id || clients[2].id,
+        clientId: clients[1]?.id || clients[0].id,
         agentId: agents[1]?.id,
         status: 'PENDING',
         taxRate: 15.0,
@@ -277,7 +277,7 @@ export async function seedQuotes() {
             quantity: itemData.quantity,
             rate: rate,
             lineTotal: lineTotal,
-            description: itemData.description
+            customDescription: itemData.description
           })
         }
 
